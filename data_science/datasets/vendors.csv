@@ -1,0 +1,251 @@
+vendor_id,vendor_name,category,city,price_start,price_end,style_tags,rating
+EO-001,Mahakarya Planner,Event Organizer,Jakarta,5000000,15000000,"Formal, Mewah, Eksklusif",4.8
+EO-002,Harmoni Sukses Event,Event Organizer,Bogor,3000000,10000000,"Elegan, Profesional, Terorganisir",4.6
+EO-003,Brilliance Organizer,Event Organizer,Depok,4000000,12000000,"Modern, Mewah, Detail",4.7
+EO-004,Grand Festive Co.,Event Organizer,Tangerang,6000000,18000000,"Eksklusif, Grand, Premium",4.9
+EO-005,Cemerlang Event,Event Organizer,Bekasi,2500000,8000000,"Sederhana, Rapi, Hangat",4.5
+EO-006,Agung Mandiri Planner,Event Organizer,Jakarta,7000000,20000000,"Mewah, Internasional, Prestisius",4.9
+EO-007,Bintang Sejahtera EO,Event Organizer,Bogor,2000000,7000000,"Tradisional, Klasik, Sopan",4.4
+EO-008,Cahaya Nusantara Event,Event Organizer,Depok,3500000,11000000,"Budaya, Nasional, Meriah",4.6
+EO-009,Duta Prima Organizer,Event Organizer,Tangerang,5500000,16000000,"Formal, Terstruktur, Profesional",4.7
+EO-010,Elegan Event House,Event Organizer,Bekasi,4500000,13000000,"Elegan, Minimalis, Modern",4.8
+EO-011,Festive Glory Planner,Event Organizer,Jakarta,8000000,22000000,"Grand, Mewah, Eksklusif",4.9
+EO-012,Gemilang Sejati EO,Event Organizer,Bogor,1800000,6000000,"Hemat, Rapi, Efisien",4.3
+EO-013,Harmonia Event Studio,Event Organizer,Depok,4200000,13500000,"Harmonis, Detail, Terencana",4.7
+EO-014,Indah Bersama Organizer,Event Organizer,Tangerang,3200000,9500000,"Hangat, Keluarga, Nyaman",4.5
+EO-015,Jaya Mandiri Planner,Event Organizer,Bekasi,5000000,15000000,"Profesional, Tepat Waktu, Terorganisir",4.6
+EO-016,Karya Terbaik Event,Event Organizer,Jakarta,6500000,19000000,"Premium, Detail, Internasional",4.8
+EO-017,Lestari Event Group,Event Organizer,Bogor,2200000,7500000,"Alam, Segar, Rustic",4.4
+EO-018,Mulia Bersatu Planner,Event Organizer,Depok,3800000,11500000,"Formal, Tertib, Berkelas",4.6
+EO-019,Nusantara Grand EO,Event Organizer,Tangerang,7500000,21000000,"Nasional, Megah, Meriah",4.9
+EO-020,Optima Event Solution,Event Organizer,Bekasi,4000000,12000000,"Solusi, Fleksibel, Profesional",4.5
+EO-021,Prima Karya Organizer,Event Organizer,Jakarta,5500000,17000000,"Mewah, Anggun, Prestisius",4.7
+EO-022,Quantum Event House,Event Organizer,Bogor,3000000,9000000,"Modern, Inovatif, Dinamis",4.5
+EO-023,Rajawali Event Studio,Event Organizer,Depok,4500000,14000000,"Nasional, Gagah, Terhormat",4.6
+EO-024,Serasi Mandiri Planner,Event Organizer,Tangerang,2800000,8500000,"Serasi, Seimbang, Tertata",4.4
+EO-025,Tara Grand Event,Event Organizer,Bekasi,6000000,18000000,"Grand, Formal, Berkelas",4.8
+EO-026,Unggul Event Organizer,Event Organizer,Jakarta,7000000,20000000,"Unggul, Premium, Elegan",4.9
+EO-027,Vibrasi Sukses EO,Event Organizer,Bogor,2500000,8000000,"Energik, Meriah, Semangat",4.3
+EO-028,Warna Warni Planner,Event Organizer,Depok,3000000,9500000,"Colorful, Kreatif, Unik",4.5
+EO-029,Xclusive Event House,Event Organizer,Tangerang,8500000,24000000,"Eksklusif, VIP, Prestisius",4.9
+EO-030,Yakin Jaya Organizer,Event Organizer,Bekasi,3500000,10500000,"Handal, Tepat, Terpercaya",4.6
+EO-031,Zenit Planner Studio,Event Organizer,Jakarta,5000000,15000000,"Tertinggi, Profesional, Premium",4.7
+EO-032,Amanah Event Co.,Event Organizer,Bogor,2000000,6500000,"Amanah, Jujur, Terpercaya",4.4
+EO-033,Berkah Mandiri EO,Event Organizer,Depok,3500000,11000000,"Berkah, Bersih, Tertata",4.5
+EO-034,Citra Prima Planner,Event Organizer,Tangerang,4500000,13500000,"Citra, Elegan, Berkelas",4.7
+EO-035,Dharma Event Group,Event Organizer,Bekasi,6000000,17000000,"Dharma, Formal, Terhormat",4.8
+EO-036,Eksis Event Studio,Event Organizer,Jakarta,4000000,12000000,"Eksis, Modern, Terkini",4.6
+EO-037,Fajar Cerah Organizer,Event Organizer,Bogor,1500000,5000000,"Cerah, Hangat, Sederhana",4.2
+EO-038,Gemah Ripah Planner,Event Organizer,Depok,5000000,15000000,"Makmur, Megah, Meriah",4.7
+EO-039,Harum Sejati Event,Event Organizer,Tangerang,3000000,9000000,"Harum, Indah, Berkesan",4.5
+EO-040,Ikhlas Bersama EO,Event Organizer,Bekasi,2000000,7000000,"Ikhlas, Hangat, Keluarga",4.3
+EO-041,Jitu Event Solution,Event Organizer,Jakarta,5500000,16500000,"Jitu, Tepat Sasaran, Efektif",4.7
+EO-042,Karena Cinta Planner,Event Organizer,Bogor,2800000,9000000,"Romantis, Hangat, Berkesan",4.6
+EO-043,Langit Biru Event,Event Organizer,Depok,4000000,12500000,"Bersih, Segar, Alami",4.5
+EO-044,Murni Event House,Event Organizer,Tangerang,3500000,10500000,"Murni, Tulus, Bersih",4.4
+EO-045,Nawacita Organizer,Event Organizer,Bekasi,6500000,19000000,"Nasional, Cita-cita, Megah",4.8
+EO-046,Obor Terang Planner,Event Organizer,Jakarta,4500000,14000000,"Terang, Cerah, Inspiratif",4.6
+EO-047,Panen Raya Event,Event Organizer,Bogor,2000000,6500000,"Panen, Meriah, Syukur",4.3
+EO-048,Qolbu Bersih EO,Event Organizer,Depok,3000000,9000000,"Bersih, Tulus, Sakral",4.5
+EO-049,Rasa Syukur Planner,Event Organizer,Tangerang,5000000,15000000,"Syukur, Khidmat, Formal",4.7
+EO-050,Surya Terbit Event,Event Organizer,Bekasi,4000000,12000000,"Baru, Cerah, Semangat",4.6
+FL-001,Bloom & Co.,Florist,Bogor,1000000,3500000,"Rustic, Romantic, Fresh",4.6
+FL-002,Taman Bunga Abadi,Florist,Jakarta,800000,2500000,"Klasik, Anggun, Elegan",4.5
+FL-003,Petal Paradise,Florist,Depok,1200000,4000000,"Tropical, Colorful, Fresh",4.7
+FL-004,Rose Garden Studio,Florist,Tangerang,1500000,5000000,"Romantic, Mewah, Premium",4.8
+FL-005,Anggrek Cantik Florist,Florist,Bekasi,700000,2000000,"Tradisional, Indah, Lokal",4.4
+FL-006,Blossom Event Florist,Florist,Jakarta,2000000,6000000,"Modern, Minimalis, Clean",4.7
+FL-007,Cempaka Wangi Florist,Florist,Bogor,900000,3000000,"Harum, Alami, Tradisional",4.5
+FL-008,Dahlia Prima Florist,Florist,Depok,1100000,3500000,"Cerah, Meriah, Colorful",4.6
+FL-009,Eterna Floral Design,Florist,Tangerang,1800000,5500000,"Elegan, Timeless, Classic",4.8
+FL-010,Frangipani Studio,Florist,Bekasi,1000000,3200000,"Tropis, Eksotis, Unik",4.5
+FL-011,Gardenia Florist,Florist,Jakarta,2500000,7000000,"Premium, Mewah, Grand",4.9
+FL-012,Hijau Segar Florist,Florist,Bogor,600000,2000000,"Alami, Rustic, Segar",4.3
+FL-013,Iris Floral Boutique,Florist,Depok,1400000,4500000,"Boutique, Artisan, Unik",4.7
+FL-014,Jasmine Bloom Studio,Florist,Tangerang,1000000,3000000,"Harum, Lembut, Romantis",4.5
+FL-015,Kenanga Florist,Florist,Bekasi,800000,2500000,"Tradisional, Lokal, Hangat",4.4
+FL-016,Lavender Dream Florist,Florist,Jakarta,1600000,5000000,"Dreamy, Lembut, Pastel",4.6
+FL-017,Mawar Merah Florist,Florist,Bogor,1000000,3500000,"Romantic, Merah, Dramatis",4.5
+FL-018,Nasturtium Florist,Florist,Depok,1300000,4000000,"Energik, Cerah, Vibrant",4.6
+FL-019,Orchid Palace Florist,Florist,Tangerang,2200000,6500000,"Mewah, Eksotis, Premium",4.8
+FL-020,Peony Studio Florist,Florist,Bekasi,1500000,4500000,"Soft, Romantic, Feminine",4.7
+FL-021,Queensflower Studio,Florist,Jakarta,3000000,8500000,"Queen, Mewah, Megah",4.9
+FL-022,Rumah Bunga Segar,Florist,Bogor,750000,2500000,"Segar, Alami, Sederhana",4.4
+FL-023,Sakura Florist Indonesia,Florist,Depok,1200000,4000000,"Jepang, Minimalis, Elegan",4.6
+FL-024,Tulip Garden Florist,Florist,Tangerang,1400000,4500000,"Eropa, Klasik, Anggun",4.7
+FL-025,Ungu Florist Studio,Florist,Bekasi,900000,3000000,"Ungu, Misterius, Elegan",4.5
+FL-026,Vanilla Bloom Florist,Florist,Jakarta,1800000,5500000,"Soft, Warm, Cozy",4.7
+FL-027,Wisteria Florist,Florist,Bogor,1100000,3500000,"Romantic, Dreamy, Lembut",4.5
+FL-028,Xotic Flower Studio,Florist,Depok,1600000,5000000,"Eksotis, Unik, Berani",4.6
+FL-029,Yellow Sunflower Florist,Florist,Tangerang,800000,2500000,"Ceria, Segar, Energik",4.4
+FL-030,Zinnia Florist House,Florist,Bekasi,1000000,3500000,"Colorful, Meriah, Ceria",4.5
+FL-031,Aster Florist Studio,Florist,Jakarta,2000000,6000000,"Bintang, Elegan, Premium",4.8
+FL-032,Bouquet Gallery,Florist,Bogor,1300000,4000000,"Gallery, Artisan, Unik",4.6
+FL-033,Carnation Florist,Florist,Depok,900000,2800000,"Kasih, Lembut, Romantis",4.5
+FL-034,Daisy Fresh Florist,Florist,Tangerang,700000,2200000,"Segar, Sederhana, Manis",4.3
+FL-035,Eucalyptus Studio,Florist,Bekasi,1500000,4500000,"Alami, Herbal, Segar",4.6
+FL-036,Flora Nusantara,Florist,Jakarta,1200000,4000000,"Lokal, Tradisional, Nasional",4.5
+FL-037,Geranium Florist,Florist,Bogor,850000,2700000,"Colorful, Ceria, Vibrant",4.4
+FL-038,Heliconia Studio,Florist,Depok,1700000,5200000,"Tropis, Bold, Dramatis",4.7
+FL-039,Ixora Florist Boutique,Florist,Tangerang,1100000,3500000,"Tropis, Segar, Lokal",4.5
+FL-040,Jade Garden Florist,Florist,Bekasi,1400000,4200000,"Asia, Elegan, Bersih",4.6
+FL-041,Kamboja Florist,Florist,Jakarta,1000000,3200000,"Bali, Eksotis, Sakral",4.5
+FL-042,Lotus Bloom Studio,Florist,Bogor,1600000,5000000,"Sakral, Indah, Bersih",4.7
+FL-043,Melati Florist,Florist,Depok,800000,2500000,"Lokal, Harum, Sakral",4.5
+FL-044,Nymphaea Florist,Florist,Tangerang,1900000,5800000,"Anggun, Air, Elegan",4.8
+FL-045,Oleander Studio,Florist,Bekasi,1200000,3800000,"Mediterranean, Elegan, Hangat",4.6
+FL-046,Pansy Florist,Florist,Jakarta,900000,2800000,"Manis, Lembut, Colorful",4.4
+FL-047,Queen Anne Florist,Florist,Bogor,1500000,4700000,"Klasik, Anggun, Vintage",4.7
+FL-048,Rafflesia Florist,Florist,Depok,1300000,4100000,"Lokal, Unik, Nasional",4.5
+FL-049,Snapdragon Florist,Florist,Tangerang,1100000,3500000,"Dramatis, Bold, Artistik",4.6
+FL-050,Tansy Garden Studio,Florist,Bekasi,900000,2900000,"Alami, Herbal, Rustic",4.4
+JK-001,Nusantara Attire,Sewa Jas/Kebaya,Depok,750000,2500000,"Tradisional, Modern, Elegan",4.9
+JK-002,Keraton Fashion House,Sewa Jas/Kebaya,Jakarta,1000000,3500000,"Mewah, Kerajaan, Formal",4.8
+JK-003,Batik & Kebaya Studio,Sewa Jas/Kebaya,Bogor,600000,2000000,"Batik, Lokal, Tradisional",4.5
+JK-004,Duta Pakaian Formal,Sewa Jas/Kebaya,Tangerang,800000,2800000,"Formal, Profesional, Rapi",4.7
+JK-005,Elegant Suit House,Sewa Jas/Kebaya,Bekasi,700000,2300000,"Elegan, Modern, Sleek",4.6
+JK-006,Formal Fashion Studio,Sewa Jas/Kebaya,Jakarta,1200000,4000000,"Premium, Eksklusif, Mewah",4.9
+JK-007,Griya Busana Formal,Sewa Jas/Kebaya,Bogor,500000,1800000,"Lokal, Terjangkau, Rapi",4.3
+JK-008,Heritage Attire,Sewa Jas/Kebaya,Depok,900000,3000000,"Heritage, Klasik, Tradisional",4.7
+JK-009,Imperial Fashion House,Sewa Jas/Kebaya,Tangerang,1500000,5000000,"Imperial, Mewah, Grand",4.8
+JK-010,Jaya Busana Formal,Sewa Jas/Kebaya,Bekasi,650000,2200000,"Terjangkau, Rapi, Formal",4.4
+JK-011,Kebaya Cantik Studio,Sewa Jas/Kebaya,Jakarta,1100000,3800000,"Cantik, Anggun, Tradisional",4.7
+JK-012,Lestari Fashion,Sewa Jas/Kebaya,Bogor,550000,1900000,"Lestari, Tradisional, Lokal",4.4
+JK-013,Mahkota Attire Studio,Sewa Jas/Kebaya,Depok,950000,3200000,"Mahkota, Kerajaan, Megah",4.8
+JK-014,Nuansa Batik House,Sewa Jas/Kebaya,Tangerang,700000,2400000,"Batik, Lokal, Kontemporer",4.5
+JK-015,Ornamen Fashion Studio,Sewa Jas/Kebaya,Bekasi,850000,2800000,"Ornamen, Detail, Artistik",4.6
+JK-016,Pesona Kebaya,Sewa Jas/Kebaya,Jakarta,1300000,4500000,"Pesona, Anggun, Premium",4.9
+JK-017,Quorum Suit Studio,Sewa Jas/Kebaya,Bogor,750000,2500000,"Profesional, Modern, Rapi",4.5
+JK-018,Royal Attire Indonesia,Sewa Jas/Kebaya,Depok,1000000,3500000,"Royal, Mewah, Formal",4.8
+JK-019,Sartoria Formal House,Sewa Jas/Kebaya,Tangerang,1800000,6000000,"Tailored, Premium, Eksklusif",4.9
+JK-020,Tirta Busana Formal,Sewa Jas/Kebaya,Bekasi,600000,2000000,"Bersih, Rapi, Terjangkau",4.3
+JK-021,Unggul Fashion Studio,Sewa Jas/Kebaya,Jakarta,1400000,4800000,"Unggul, Premium, Elegan",4.8
+JK-022,Vintage Suit House,Sewa Jas/Kebaya,Bogor,800000,2700000,"Vintage, Retro, Klasik",4.6
+JK-023,Warisan Batik Studio,Sewa Jas/Kebaya,Depok,700000,2300000,"Warisan, Tradisional, Budaya",4.5
+JK-024,Xquisite Fashion,Sewa Jas/Kebaya,Tangerang,2000000,7000000,"Eksklsif, Haute Couture, Mewah",4.9
+JK-025,Yuwana Kebaya Studio,Sewa Jas/Kebaya,Bekasi,750000,2500000,"Anggun, Tradisional, Lokal",4.6
+JK-026,Zamrud Fashion House,Sewa Jas/Kebaya,Jakarta,1600000,5500000,"Hijau, Mewah, Elegan",4.8
+JK-027,Adat Nusantara Attire,Sewa Jas/Kebaya,Bogor,600000,2000000,"Adat, Budaya, Lokal",4.4
+JK-028,Baju Pengantin Studio,Sewa Jas/Kebaya,Depok,900000,3000000,"Pengantin, Sakral, Formal",4.7
+JK-029,Cantik Selalu Fashion,Sewa Jas/Kebaya,Tangerang,700000,2300000,"Cantik, Perempuan, Anggun",4.5
+JK-030,Denim & Silk Studio,Sewa Jas/Kebaya,Bekasi,850000,2800000,"Modern, Mix, Kontemporer",4.5
+JK-031,Etnik Fashion House,Sewa Jas/Kebaya,Jakarta,1100000,3700000,"Etnik, Budaya, Artistik",4.7
+JK-032,Formal & Chic Studio,Sewa Jas/Kebaya,Bogor,800000,2600000,"Chic, Modern, Formal",4.5
+JK-033,Glamour Kebaya Studio,Sewa Jas/Kebaya,Depok,1000000,3400000,"Glamour, Glam, Mewah",4.8
+JK-034,Haute Kebaya House,Sewa Jas/Kebaya,Tangerang,2200000,7500000,"Haute Couture, Premium, Formal",4.9
+JK-035,Iconic Suit Studio,Sewa Jas/Kebaya,Bekasi,950000,3200000,"Iconic, Klasik, Timeless",4.6
+JK-036,Javanesse Attire,Sewa Jas/Kebaya,Jakarta,1200000,4000000,"Jawa, Tradisional, Formal",4.7
+JK-037,Kebaya Queen Studio,Sewa Jas/Kebaya,Bogor,1000000,3500000,"Queen, Anggun, Mewah",4.8
+JK-038,Luxe Fashion House,Sewa Jas/Kebaya,Depok,1800000,6000000,"Luxe, Premium, Eksklusif",4.9
+JK-039,Merah Putih Attire,Sewa Jas/Kebaya,Tangerang,700000,2300000,"Nasional, Formal, Bangga",4.5
+JK-040,Noble Suit Studio,Sewa Jas/Kebaya,Bekasi,1100000,3700000,"Noble, Terhormat, Formal",4.7
+JK-041,Otentik Fashion,Sewa Jas/Kebaya,Jakarta,900000,3000000,"Otentik, Lokal, Budaya",4.6
+JK-042,Puri Kebaya Studio,Sewa Jas/Kebaya,Bogor,750000,2500000,"Puri, Kerajaan, Anggun",4.7
+JK-043,Queensway Attire,Sewa Jas/Kebaya,Depok,1300000,4300000,"Premium, Royal, Mewah",4.8
+JK-044,Regal Fashion House,Sewa Jas/Kebaya,Tangerang,1600000,5300000,"Regal, Megah, Formal",4.8
+JK-045,Sekar Kebaya Studio,Sewa Jas/Kebaya,Bekasi,800000,2700000,"Sekar, Bunga, Anggun",4.6
+JK-046,Tenun Indah Attire,Sewa Jas/Kebaya,Jakarta,1000000,3300000,"Tenun, Tradisional, Budaya",4.6
+JK-047,Ulos Fashion House,Sewa Jas/Kebaya,Bogor,750000,2500000,"Batak, Tradisional, Formal",4.5
+JK-048,Vogue Kebaya Studio,Sewa Jas/Kebaya,Depok,1200000,4000000,"Modern, Vogue, Stylish",4.7
+JK-049,Wearhouse Formal,Sewa Jas/Kebaya,Tangerang,900000,3000000,"Formal, Profesional, Rapi",4.5
+JK-050,Xtravaganza Attire,Sewa Jas/Kebaya,Bekasi,2500000,8500000,"Extravagant, Mewah, Grand",4.9
+HM-001,GlowUp Beauty,Hair and MakeUp,Bekasi,500000,2000000,"Flawless, Korean Look, Bold",4.7
+HM-002,Cantika Beauty Studio,Hair and MakeUp,Jakarta,700000,2500000,"Natural, Elegant, Glam",4.8
+HM-003,Aura Makeup Artist,Hair and MakeUp,Bogor,450000,1800000,"Natural, Fresh, Anggun",4.5
+HM-004,Dazzle Beauty House,Hair and MakeUp,Depok,600000,2200000,"Dazzling, Glitter, Bold",4.6
+HM-005,Elok Beauty Studio,Hair and MakeUp,Tangerang,550000,2000000,"Elok, Natural, Anggun",4.5
+HM-006,Flawless Studio MUA,Hair and MakeUp,Jakarta,900000,3200000,"Flawless, Premium, Editorial",4.9
+HM-007,Glow & Glamour Studio,Hair and MakeUp,Bogor,500000,1900000,"Glow, Natural, Minimalis",4.6
+HM-008,Haute Beauty Artist,Hair and MakeUp,Depok,1100000,4000000,"Haute, Premium, Eksklusif",4.9
+HM-009,Indah Beauty Studio,Hair and MakeUp,Tangerang,480000,1750000,"Indah, Natural, Sederhana",4.4
+HM-010,Javanese Beauty MUA,Hair and MakeUp,Bekasi,550000,2000000,"Jawa, Tradisional, Anggun",4.5
+HM-011,Kiara Beauty Studio,Hair and MakeUp,Jakarta,750000,2700000,"Modern, Glam, Stylish",4.7
+HM-012,Lux Beauty Artist,Hair and MakeUp,Bogor,650000,2300000,"Luxury, Mewah, Premium",4.7
+HM-013,Mira Beauty Studio,Hair and MakeUp,Depok,500000,1900000,"Soft, Natural, Elegan",4.5
+HM-014,Naura Makeup Artist,Hair and MakeUp,Tangerang,580000,2100000,"Fresh, Youthful, Natural",4.6
+HM-015,Olive Beauty Studio,Hair and MakeUp,Bekasi,700000,2500000,"Earth Tone, Natural, Anggun",4.7
+HM-016,Prestige Beauty MUA,Hair and MakeUp,Jakarta,1200000,4500000,"Prestige, Eksklusif, Premium",4.9
+HM-017,Queen Glam Studio,Hair and MakeUp,Bogor,800000,2900000,"Queen, Bold, Glamorous",4.8
+HM-018,Radiant Beauty Artist,Hair and MakeUp,Depok,650000,2300000,"Radiant, Glowing, Natural",4.6
+HM-019,Serasi Beauty Studio,Hair and MakeUp,Tangerang,500000,1850000,"Serasi, Harmonis, Anggun",4.5
+HM-020,Tiar Beauty MUA,Hair and MakeUp,Bekasi,600000,2200000,"Mahkota, Anggun, Formal",4.6
+HM-021,Ultima Beauty House,Hair and MakeUp,Jakarta,950000,3500000,"Ultimate, Premium, Elegan",4.8
+HM-022,Velvet Beauty Studio,Hair and MakeUp,Bogor,700000,2500000,"Velvet, Mewah, Smooth",4.7
+HM-023,Warna Beauty Artist,Hair and MakeUp,Depok,500000,1900000,"Colorful, Ekspresif, Bold",4.5
+HM-024,Xclusive MUA Studio,Hair and MakeUp,Tangerang,1500000,5500000,"Eksklusif, VIP, Premium",4.9
+HM-025,Yuna Beauty Studio,Hair and MakeUp,Bekasi,550000,2000000,"Korean, Fresh, Youthful",4.6
+HM-026,Zahira Beauty Artist,Hair and MakeUp,Jakarta,800000,2900000,"Islami, Anggun, Natural",4.7
+HM-027,Aurora Makeup Studio,Hair and MakeUp,Bogor,600000,2200000,"Aurora, Fresh, Glowing",4.6
+HM-028,Bloom Beauty MUA,Hair and MakeUp,Depok,480000,1700000,"Bloom, Natural, Segar",4.4
+HM-029,Chic Beauty Studio,Hair and MakeUp,Tangerang,700000,2500000,"Chic, Modern, Stylish",4.7
+HM-030,Draping Beauty Artist,Hair and MakeUp,Bekasi,900000,3200000,"Dramatic, Bold, Ekspresif",4.8
+HM-031,Ethereal Beauty MUA,Hair and MakeUp,Jakarta,1000000,3700000,"Ethereal, Dreamy, Anggun",4.8
+HM-032,Fancy Beauty Studio,Hair and MakeUp,Bogor,600000,2200000,"Fancy, Colorful, Bold",4.5
+HM-033,Glitter & Grace MUA,Hair and MakeUp,Depok,750000,2700000,"Glitter, Grace, Glamorous",4.7
+HM-034,Hera Beauty Studio,Hair and MakeUp,Tangerang,550000,2000000,"Goddess, Anggun, Elegan",4.6
+HM-035,Iconic Beauty Artist,Hair and MakeUp,Bekasi,850000,3000000,"Iconic, Timeless, Classic",4.7
+HM-036,Jewel Beauty Studio,Hair and MakeUp,Jakarta,1100000,4000000,"Permata, Mewah, Premium",4.8
+HM-037,Kasih Beauty MUA,Hair and MakeUp,Bogor,450000,1650000,"Kasih, Natural, Lembut",4.3
+HM-038,Lumière Beauty Studio,Hair and MakeUp,Depok,800000,2900000,"Cahaya, Glowing, Elegan",4.7
+HM-039,Mystic Beauty Artist,Hair and MakeUp,Tangerang,700000,2500000,"Mistis, Dramatis, Unik",4.6
+HM-040,Nova Beauty Studio,Hair and MakeUp,Bekasi,600000,2200000,"Nova, Modern, Fresh",4.5
+HM-041,Opulent Beauty MUA,Hair and MakeUp,Jakarta,1300000,4800000,"Opulent, Mewah, Eksklusif",4.9
+HM-042,Pearl Beauty Studio,Hair and MakeUp,Bogor,700000,2500000,"Pearl, Anggun, Lembut",4.6
+HM-043,Regal MUA Studio,Hair and MakeUp,Depok,900000,3200000,"Regal, Premium, Formal",4.8
+HM-044,Stellar Beauty Artist,Hair and MakeUp,Tangerang,600000,2200000,"Bintang, Glam, Sparkle",4.6
+HM-045,Timeless MUA Studio,Hair and MakeUp,Bekasi,750000,2700000,"Timeless, Classic, Elegan",4.7
+HM-046,Urban Beauty Studio,Hair and MakeUp,Jakarta,650000,2300000,"Urban, Modern, Chic",4.6
+HM-047,Velvet Rose MUA,Hair and MakeUp,Bogor,700000,2500000,"Rose, Romantic, Lembut",4.6
+HM-048,Whimsy Beauty Artist,Hair and MakeUp,Depok,550000,2000000,"Whimsical, Dreamy, Soft",4.5
+HM-049,Ximena Beauty Studio,Hair and MakeUp,Tangerang,850000,3000000,"Latina, Bold, Colorful",4.7
+HM-050,Zara Beauty MUA,Hair and MakeUp,Bekasi,700000,2500000,"Modern, Stylish, Premium",4.7
+FT-001,Kenangan Abadi,Fotografer,Tangerang,1500000,4000000,"Cinematic, Vintage, Jurnalistik",4.8
+FT-002,Abadi Foto Studio,Fotografer,Jakarta,2000000,5500000,"Formal, Profesional, Eksklusif",4.8
+FT-003,Cahaya Foto Studio,Fotografer,Bogor,1200000,3500000,"Natural Light, Outdoor, Fresh",4.6
+FT-004,Dramatis Photography,Fotografer,Depok,1800000,5000000,"Dramatis, Cinematic, Bold",4.7
+FT-005,Eternal Moments Studio,Fotografer,Tangerang,1600000,4500000,"Timeless, Romantic, Warm",4.8
+FT-006,Frame & Focus Studio,Fotografer,Bekasi,1300000,3800000,"Detail, Presisi, Profesional",4.6
+FT-007,Golden Hour Photo,Fotografer,Jakarta,2500000,7000000,"Golden Hour, Warm, Cinematic",4.9
+FT-008,Hari Baik Photography,Fotografer,Bogor,1000000,3000000,"Hangat, Dokumenter, Natural",4.5
+FT-009,Iconic Frame Studio,Fotografer,Depok,1500000,4200000,"Iconic, Dramatic, Premium",4.7
+FT-010,Jepret Indah Studio,Fotografer,Tangerang,900000,2800000,"Candid, Natural, Jujur",4.4
+FT-011,Karya Lens Studio,Fotografer,Bekasi,1700000,4800000,"Artisan, Artistic, Premium",4.8
+FT-012,Lanskap Visual Studio,Fotografer,Jakarta,3000000,8500000,"Grand, Landscape, Megah",4.9
+FT-013,Momen Berharga Photo,Fotografer,Bogor,1100000,3300000,"Berkesan, Warm, Natural",4.5
+FT-014,Narasi Visual Studio,Fotografer,Depok,1600000,4500000,"Naratif, Storytelling, Cinematic",4.7
+FT-015,Optik Prima Studio,Fotografer,Tangerang,1400000,4000000,"Presisi, Tajam, Profesional",4.6
+FT-016,Precious Moments Photo,Fotografer,Bekasi,1200000,3500000,"Precious, Warm, Berkesan",4.6
+FT-017,Quality Foto Studio,Fotografer,Jakarta,2200000,6500000,"Kualitas, Premium, Formal",4.8
+FT-018,Romantik Frame Studio,Fotografer,Bogor,1300000,3800000,"Romantic, Lembut, Dreamy",4.7
+FT-019,Snapshot Elegant Studio,Fotografer,Depok,1000000,3000000,"Elegan, Bersih, Minimalis",4.5
+FT-020,Timeless Photo Studio,Fotografer,Tangerang,1800000,5200000,"Timeless, Classic, Formal",4.8
+FT-021,Ultra Focus Studio,Fotografer,Bekasi,2000000,5800000,"Ultra, Presisi, Premium",4.8
+FT-022,Vivid Photography,Fotografer,Jakarta,2700000,7500000,"Vivid, Colorful, Bold",4.9
+FT-023,Warna Cahaya Studio,Fotografer,Bogor,1200000,3600000,"Colorful, Cerah, Segar",4.5
+FT-024,Xenon Photography,Fotografer,Depok,1500000,4300000,"Tajam, Terang, Presisi",4.6
+FT-025,Yuna Photography,Fotografer,Tangerang,1100000,3300000,"Soft, Natural, Dreamy",4.6
+FT-026,Zoom Perfect Studio,Fotografer,Bekasi,1400000,4000000,"Presisi, Detail, Profesional",4.7
+FT-027,Arsa Photography,Fotografer,Jakarta,1900000,5500000,"Cinematic, Film, Artistic",4.8
+FT-028,Birulangit Studio,Fotografer,Bogor,1000000,3000000,"Outdoor, Natural, Biru",4.5
+FT-029,Crystal Clear Photo,Fotografer,Depok,1600000,4600000,"Crystal, Jernih, Presisi",4.7
+FT-030,Diorama Visual Studio,Fotografer,Tangerang,2100000,6000000,"Diorama, Artistic, Eksklusif",4.8
+FT-031,Ekspresif Photo Studio,Fotografer,Bekasi,1300000,3900000,"Ekspresif, Bold, Artistic",4.6
+FT-032,Fokus Jelas Studio,Fotografer,Jakarta,2400000,6800000,"Fokus, Presisi, Profesional",4.8
+FT-033,Gambar Indah Studio,Fotografer,Bogor,900000,2700000,"Indah, Natural, Simple",4.4
+FT-034,Horizon Photography,Fotografer,Depok,1700000,5000000,"Horizon, Grand, Landscape",4.7
+FT-035,Imaji Prima Studio,Fotografer,Tangerang,1200000,3600000,"Imaji, Artistik, Kreatif",4.6
+FT-036,Jejak Kisah Studio,Fotografer,Bekasi,1400000,4100000,"Storytelling, Naratif, Hangat",4.7
+FT-037,Klik Visual Studio,Fotografer,Jakarta,2600000,7200000,"Premium, Eksklusif, Formal",4.9
+FT-038,Lensa Emas Studio,Fotografer,Bogor,1100000,3300000,"Emas, Warm, Premium",4.6
+FT-039,Maha Visual Studio,Fotografer,Depok,1800000,5200000,"Grand, Megah, Dramatis",4.7
+FT-040,Nirmala Photo Studio,Fotografer,Tangerang,1000000,3000000,"Bersih, Natural, Murni",4.5
+FT-041,Optimus Frame Studio,Fotografer,Bekasi,1600000,4600000,"Optimal, Terbaik, Presisi",4.7
+FT-042,Prism Photography,Fotografer,Jakarta,2200000,6300000,"Prisma, Colorful, Artistic",4.8
+FT-043,Quasar Photo Studio,Fotografer,Bogor,1300000,3800000,"Bintang, Dramatis, Bold",4.6
+FT-044,Refleksi Visual Studio,Fotografer,Depok,1500000,4300000,"Refleksi, Dalam, Bermakna",4.7
+FT-045,Sinema Foto Studio,Fotografer,Tangerang,2000000,5700000,"Sinema, Film, Cinematic",4.8
+FT-046,Terbaik Photography,Fotografer,Bekasi,1100000,3300000,"Terbaik, Handal, Profesional",4.5
+FT-047,Unik Foto Studio,Fotografer,Jakarta,1800000,5200000,"Unik, Kreatif, Artistic",4.7
+FT-048,Vision Art Studio,Fotografer,Bogor,1200000,3700000,"Visi, Artistic, Bermakna",4.6
+FT-049,Wonder Photography,Fotografer,Depok,1600000,4700000,"Wonder, Ajaib, Unik",4.7
+FT-050,XYZ Photography Studio,Fotografer,Tangerang,2300000,6600000,"Premium, Modern, Elegan",4.8
