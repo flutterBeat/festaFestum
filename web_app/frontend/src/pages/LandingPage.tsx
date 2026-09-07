@@ -15,11 +15,11 @@ const searchFields: Field[] = [
 ]
 
 const kategori = [
-  { label: 'MUA', image: '/img/kategori-mua.jpg', to: '/' },
-  { label: 'Jas & Kebaya', image: '/img/kategori-attire.jpg', to: '/' },
+  { label: 'MUA', image: '/img/kategori-mua.png', to: '/mua' },
+  { label: 'Jas & Kebaya', image: '/img/kategori-attire.png', to: '/jas-kebaya' },
   { label: 'Florist', image: '/img/kategori-florist.png', to: '/florist' },
-  { label: 'Fotografer', image: '/img/kategori-fotografer.jpg', to: '/' },
-  { label: 'Event Organizer', image: '/img/kategori-eo.jpg', to: '/' },
+  { label: 'Fotografer', image: '/img/kategori-fotografer.png', to: '/fotografer' },
+  { label: 'Event Organizer', image: '/img/kategori-eo.png', to: '/event-organizer' },
 ]
 
 const langkah = [

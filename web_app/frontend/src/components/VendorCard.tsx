@@ -1,5 +1,7 @@
+import { Link } from 'react-router-dom'
 import Img from './Img'
 import { StarIcon } from './icons'
+import { rupiah } from '../lib/format'
 
 export type Vendor = {
   id: string
@@ -11,11 +13,8 @@ export type Vendor = {
   image: string
 }
 
-const rupiah = (n: number) =>
-  `Rp ${n.toLocaleString('id-ID', { minimumFractionDigits: 2 })}`
-
 /** Kartu vendor di grid halaman kategori. */
-export default function VendorCard({ vendor }: { vendor: Vendor }) {
+export default function VendorCard({ vendor, to }: { vendor: Vendor; to: string }) {
   return (
     <article className="flex flex-col border border-line bg-white">
       <Img src={vendor.image} alt={vendor.name} className="h-[210px] w-full object-cover" />
@@ -36,12 +35,12 @@ export default function VendorCard({ vendor }: { vendor: Vendor }) {
           <p className="text-[12px] text-muted">Mulai dari</p>
           <p className="font-display text-[21px] font-semibold">{rupiah(vendor.priceFrom)}</p>
         </div>
-        <button
-          type="button"
+        <Link
+          to={to}
           className="rounded-sm border border-line px-4 py-1.5 text-[12px] transition-colors hover:border-navy-900 hover:text-navy-900"
         >
           Lihat Profil
-        </button>
+        </Link>
       </div>
     </article>
   )

@@ -33,10 +33,10 @@ export default function Navbar() {
           ))}
         </nav>
 
-        <button
-          type="button"
-          aria-label="Akun saya"
-          className="h-9 w-9 rounded-full bg-stone-300 transition-colors hover:bg-stone-400"
+        <Link
+          to="/masuk"
+          aria-label="Masuk ke akun saya"
+          className="block h-9 w-9 rounded-full bg-stone-300 transition-colors hover:bg-stone-400"
         />
       </div>
     </header>

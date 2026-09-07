@@ -24,12 +24,12 @@ const searchFields: Field[] = [
 // Data contoh sesuai mockup. Diganti hasil GET /api/v1/vendors?category=florist
 // begitu halaman ini disambungkan ke backend.
 const vendors: Vendor[] = [
-  { id: '1', name: 'Peony Studio Florist', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 500000, image: '/img/florist-peony.jpg' },
-  { id: '2', name: 'Bloom & Co', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 750000, image: '/img/florist-bloom.jpg' },
-  { id: '3', name: 'Botanica Florist', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 800000, image: '/img/florist-botanica.jpg' },
-  { id: '4', name: 'Rose Garden Studio', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 450000, image: '/img/florist-rose.jpg' },
-  { id: '5', name: 'Galdenia Florist', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 300000, image: '/img/florist-galdenia.jpg' },
-  { id: '6', name: 'Kenangan Florist', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 350000, image: '/img/florist-kenangan.jpg' },
+  { id: 'peony-studio', name: 'Peony Studio Florist', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 500000, image: '/img/florist-peony.jpg' },
+  { id: 'bloom-co', name: 'Bloom & Co', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 750000, image: '/img/florist-bloom.jpg' },
+  { id: 'botanica', name: 'Botanica Florist', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 800000, image: '/img/florist-botanica.jpg' },
+  { id: 'rose-garden', name: 'Rose Garden Studio', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 450000, image: '/img/florist-rose.jpg' },
+  { id: 'galdenia', name: 'Galdenia Florist', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 300000, image: '/img/florist-galdenia.jpg' },
+  { id: 'kenangan', name: 'Kenangan Florist', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 350000, image: '/img/florist-kenangan.jpg' },
 ]
 
 export default function FloristPage() {
@@ -57,7 +57,7 @@ export default function FloristPage() {
 
         <div className="mt-7 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
           {vendors.map((v) => (
-            <VendorCard key={v.id} vendor={v} />
+            <VendorCard key={v.id} vendor={v} to={`/florist/${v.id}`} />
           ))}
         </div>
       </section>

@@ -2,7 +2,13 @@ import { Link } from 'react-router-dom'
 import { MailIcon, InstagramIcon } from './icons'
 
 const navigasi = ['Beranda', 'Festa AI', 'Pesanan Saya']
-const layanan = ['MUA', 'Fotografer', 'Florist', 'Jas & Kebaya', 'Event Organizer']
+const layanan = [
+  { label: 'MUA', to: '/mua' },
+  { label: 'Fotografer', to: '/fotografer' },
+  { label: 'Florist', to: '/florist' },
+  { label: 'Jas & Kebaya', to: '/jas-kebaya' },
+  { label: 'Event Organizer', to: '/event-organizer' },
+]
 
 export default function Footer() {
   return (
@@ -33,12 +39,9 @@ export default function Footer() {
             <h4 className="text-[13px] font-semibold text-white">Layanan</h4>
             <ul className="mt-4 space-y-3 text-[13px]">
               {layanan.map((l) => (
-                <li key={l}>
-                  <Link
-                    to={l === 'Florist' ? '/florist' : '/'}
-                    className="transition-colors hover:text-white"
-                  >
-                    {l}
+                <li key={l.label}>
+                  <Link to={l.to} className="transition-colors hover:text-white">
+                    {l.label}
                   </Link>
                 </li>
               ))}
