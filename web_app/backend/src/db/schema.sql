@@ -1,5 +1,6 @@
 -- ============================================================
 -- FESTA FESTUM - Database Schema (PostgreSQL)
+-- Versi 2 (kategori & lead time dipindah ke services)
 -- Marketplace vendor acara formal (WO, Florist, Jas/Kebaya, MUA, Fotografer)
 -- Scope MVP: JABODETABEK
 -- ============================================================
@@ -61,11 +62,9 @@ CREATE TABLE vendors (
   vendor_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_user_id         UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   business_name         VARCHAR(150) NOT NULL,
-  category              vendor_category NOT NULL,
   city                  jabodetabek_city NOT NULL,
   address               TEXT,
   description           TEXT,
-  minimum_notice_days   INT NOT NULL DEFAULT 7 CHECK (minimum_notice_days >= 0),
   is_verified           BOOLEAN NOT NULL DEFAULT FALSE,
   rating_avg            NUMERIC(2,1) NOT NULL DEFAULT 0.0 CHECK (rating_avg BETWEEN 0 AND 5),
   rating_count          INT NOT NULL DEFAULT 0,
@@ -73,7 +72,7 @@ CREATE TABLE vendors (
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_vendors_city_category ON vendors (city, category);
+CREATE INDEX idx_vendors_city ON vendors (city);
 
 -- ------------------------------------------------------------
 -- SERVICES
@@ -83,8 +82,10 @@ CREATE TABLE services (
   service_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   vendor_id      UUID NOT NULL REFERENCES vendors(vendor_id) ON DELETE CASCADE,
   service_name   VARCHAR(150) NOT NULL,
+  category       vendor_category NOT NULL,
   description    TEXT,
   price          NUMERIC(12,2) NOT NULL CHECK (price >= 0),
+  minimum_notice_days INT NOT NULL DEFAULT 7 CHECK (minimum_notice_days >= 0),
   is_formal_only BOOLEAN NOT NULL DEFAULT TRUE,
   is_active      BOOLEAN NOT NULL DEFAULT TRUE,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -92,6 +93,7 @@ CREATE TABLE services (
 );
 
 CREATE INDEX idx_services_vendor ON services (vendor_id);
+CREATE INDEX idx_services_category ON services (category);
 
 -- ------------------------------------------------------------
 -- PORTFOLIO_IMAGES
@@ -183,3 +185,25 @@ CREATE TABLE reviews (
 );
 
 CREATE INDEX idx_reviews_vendor ON reviews (vendor_id);
+
+-- ============================================================
+-- CATATAN IMPLEMENTASI
+-- ============================================================
+-- 1. Redis lock (soft-lock) tetap wajib di layer aplikasi Node.js untuk
+--    mencegah race condition detik-per-detik sebelum row ter-INSERT.
+--    UNIQUE (vendor_id, event_date, time_slot) di vendor_schedules
+--    adalah pengaman kedua di level DB kalau lock gagal.
+-- 2. Cron job / scheduled task diperlukan untuk auto-expire booking:
+--    jika payment_status = 'pending' dan now() > soft_lock_expires_at,
+--    set booking -> 'expired' dan vendor_schedules -> 'available'.
+-- 3. minimum_notice_days ada di tabel services (bukan vendors), karena
+--    tiap layanan punya lead time berbeda: sewa kebaya butuh waktu fitting
+--    lama, buket bunga bisa mendadak. Dicek di level aplikasi saat user
+--    request /schedules/check, bukan di DB constraint (butuh perbandingan
+--    dengan tanggal request yang dinamis).
+-- 4. category ada di services, bukan vendors, sehingga satu vendor bisa
+--    menjual layanan lintas kategori (mis. MUA sekaligus florist).
+--    Filter GET /vendors?category= dilakukan lewat EXISTS ke services.
+-- 5. Batasan satu akun = satu vendor diterapkan di level aplikasi, bukan
+--    UNIQUE constraint, agar mudah dilonggarkan jika nanti dibutuhkan.
+-- ============================================================

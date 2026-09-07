@@ -1,0 +1,25 @@
+const express = require('express');
+const {
+  createVendor, listVendors, getMyVendor, getVendorDetail, updateVendor,
+} = require('../controllers/vendor.controller');
+const { createService, listServices } = require('../controllers/service.controller');
+const { requireAuth, requireRole } = require('../middleware/authMiddleware');
+
+const router = express.Router();
+
+// Public
+router.get('/', listVendors);
+
+// PENTING: '/me' harus di atas '/:vendorId', kalau tidak Express akan
+// membaca "me" sebagai vendorId dan query UUID-nya gagal.
+router.get('/me', requireAuth, requireRole('vendor_owner'), getMyVendor);
+
+router.get('/:vendorId', getVendorDetail);
+router.get('/:vendorId/services', listServices);
+
+// Protected
+router.post('/', requireAuth, requireRole('vendor_owner'), createVendor);
+router.patch('/:vendorId', requireAuth, requireRole('vendor_owner'), updateVendor);
+router.post('/:vendorId/services', requireAuth, requireRole('vendor_owner'), createService);
+
+module.exports = router;
