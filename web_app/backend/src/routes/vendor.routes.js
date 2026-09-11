@@ -1,6 +1,7 @@
 const express = require('express');
 const {
   createVendor, listVendors, getMyVendor, getVendorDetail, updateVendor,
+  upsertMyDocument, listMyDocuments,
 } = require('../controllers/vendor.controller');
 const { createService, listServices } = require('../controllers/service.controller');
 const { requireAuth, requireRole } = require('../middleware/authMiddleware');
@@ -13,6 +14,8 @@ router.get('/', listVendors);
 // PENTING: '/me' harus di atas '/:vendorId', kalau tidak Express akan
 // membaca "me" sebagai vendorId dan query UUID-nya gagal.
 router.get('/me', requireAuth, requireRole('vendor_owner'), getMyVendor);
+router.get('/me/documents', requireAuth, requireRole('vendor_owner'), listMyDocuments);
+router.put('/me/documents/:docType', requireAuth, requireRole('vendor_owner'), upsertMyDocument);
 
 router.get('/:vendorId', getVendorDetail);
 router.get('/:vendorId/services', listServices);

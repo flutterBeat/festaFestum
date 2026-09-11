@@ -15,11 +15,13 @@ async function createVendor(req, res, next) {
   try {
     const { business_name, city, address, description } = req.body;
 
-    if (!business_name || !city) {
-      return res.status(400).json({ message: 'business_name dan city wajib diisi' });
+    if (!business_name) {
+      return res.status(400).json({ message: 'business_name wajib diisi' });
     }
 
-    if (!VALID_CITIES.includes(city)) {
+    // city opsional di langkah 1 pendaftaran vendor; vendor tanpa kota tidak
+    // akan muncul di hasil pencarian sampai dilengkapi lewat PATCH.
+    if (city && !VALID_CITIES.includes(city)) {
       return res.status(400).json({ message: 'city tidak valid', allowed: VALID_CITIES });
     }
 
@@ -36,7 +38,7 @@ async function createVendor(req, res, next) {
       `INSERT INTO vendors (owner_user_id, business_name, city, address, description)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [req.user.user_id, business_name, city, address || null, description || null]
+      [req.user.user_id, business_name, city || null, address || null, description || null]
     );
 
     res.status(201).json({ vendor: result.rows[0] });
@@ -227,4 +229,81 @@ async function updateVendor(req, res, next) {
   }
 }
 
-module.exports = { createVendor, listVendors, getMyVendor, getVendorDetail, updateVendor };
+// ------------------------------------------------------------
+// Dokumen verifikasi vendor (KTP / NPWP / SIUP)
+// Hanya metadata berkas yang disimpan; lihat catatan di schema.sql.
+// ------------------------------------------------------------
+const VALID_DOC_TYPES = ['ktp', 'npwp', 'siup'];
+
+// Vendor selalu dicari lewat owner_user_id, tidak pernah lewat id dari client,
+// jadi tidak ada jalan untuk menyentuh dokumen vendor orang lain.
+async function findMyVendorId(userId) {
+  const result = await pool.query(
+    'SELECT vendor_id FROM vendors WHERE owner_user_id = $1',
+    [userId]
+  );
+  return result.rows[0]?.vendor_id || null;
+}
+
+// PUT /api/v1/vendors/me/documents/:docType  (role: vendor_owner)
+// Unggah ulang jenis yang sama menimpa baris lama dan mengulang kurasi.
+async function upsertMyDocument(req, res, next) {
+  try {
+    const docType = req.params.docType;
+    const { file_name } = req.body;
+
+    if (!VALID_DOC_TYPES.includes(docType)) {
+      return res.status(400).json({ message: 'Jenis dokumen tidak valid', allowed: VALID_DOC_TYPES });
+    }
+
+    if (!file_name || typeof file_name !== 'string') {
+      return res.status(400).json({ message: 'file_name wajib diisi' });
+    }
+
+    const vendorId = await findMyVendorId(req.user.user_id);
+    if (!vendorId) {
+      return res.status(404).json({ message: 'Anda belum memiliki profil vendor' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO vendor_documents (vendor_id, doc_type, file_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (vendor_id, doc_type) DO UPDATE
+         SET file_name = EXCLUDED.file_name,
+             status      = 'pending',
+             uploaded_at = now()
+       RETURNING document_id, doc_type, file_name, status, uploaded_at`,
+      [vendorId, docType, file_name.slice(0, 255)]
+    );
+
+    res.status(201).json({ document: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/vendors/me/documents  (role: vendor_owner)
+async function listMyDocuments(req, res, next) {
+  try {
+    const vendorId = await findMyVendorId(req.user.user_id);
+    if (!vendorId) {
+      return res.status(404).json({ message: 'Anda belum memiliki profil vendor' });
+    }
+
+    const result = await pool.query(
+      `SELECT document_id, doc_type, file_name, status, uploaded_at
+       FROM vendor_documents WHERE vendor_id = $1
+       ORDER BY uploaded_at ASC`,
+      [vendorId]
+    );
+
+    res.json({ documents: result.rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  createVendor, listVendors, getMyVendor, getVendorDetail, updateVendor,
+  upsertMyDocument, listMyDocuments,
+};

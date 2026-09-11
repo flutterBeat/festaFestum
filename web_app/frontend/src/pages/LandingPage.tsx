@@ -87,7 +87,7 @@ export default function LandingPage() {
                 alt={k.label}
                 className="h-[240px] w-full object-cover transition-opacity group-hover:opacity-90"
               />
-              <span className="sr-only">{k.label}</span>
+              <span className="mt-3 block text-center text-[14px] font-medium">{k.label}</span>
             </Link>
           ))}
         </div>

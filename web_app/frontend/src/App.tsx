@@ -13,10 +13,8 @@ import AttireDetailPage from './pages/AttireDetailPage'
 import FotograferDetailPage from './pages/FotograferDetailPage'
 import EoDetailPage from './pages/EoDetailPage'
 import FloristOrderPage from './pages/FloristOrderPage'
-import MuaOrderPage from './pages/MuaOrderPage'
 import AttireOrderPage from './pages/AttireOrderPage'
-import FotograferOrderPage from './pages/FotograferOrderPage'
-import EoOrderPage from './pages/EoOrderPage'
+import VenueOrderPage from './pages/VenueOrderPage'
 import CheckoutPage from './pages/CheckoutPage'
 import VirtualAccountPage from './pages/VirtualAccountPage'
 import KonfirmasiPage from './pages/KonfirmasiPage'
@@ -24,6 +22,12 @@ import PesananSayaPage from './pages/PesananSayaPage'
 import FestaAiPage from './pages/FestaAiPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import VendorLayout from './components/VendorLayout'
+import VendorDashboardPage from './pages/VendorDashboardPage'
+import VendorPemesananPage from './pages/VendorPemesananPage'
+import VendorJadwalPage from './pages/VendorJadwalPage'
+import VendorLayananPage from './pages/VendorLayananPage'
+import VendorKeuanganPage from './pages/VendorKeuanganPage'
 
 /** Navbar + Footer hanya untuk halaman situs. Halaman auth full-screen,
  *  jadi dia duduk di luar layout ini. */
@@ -61,13 +65,22 @@ export default function App() {
         {/* Halaman pengisian pesanan punya header/footer sendiri (tanpa
             navigasi) supaya user tidak keluar alur di tengah pengisian. */}
         <Route path="/florist/:id/pesan" element={<FloristOrderPage />} />
-        <Route path="/mua/:id/pesan" element={<MuaOrderPage />} />
         <Route path="/jas-kebaya/:id/pesan" element={<AttireOrderPage />} />
-        <Route path="/fotografer/:id/pesan" element={<FotograferOrderPage />} />
-        <Route path="/event-organizer/:id/pesan" element={<EoOrderPage />} />
+        <Route path="/mua/:id/pesan" element={<VenueOrderPage kind="mua" />} />
+        <Route path="/fotografer/:id/pesan" element={<VenueOrderPage kind="fotografer" />} />
+        <Route path="/event-organizer/:id/pesan" element={<VenueOrderPage kind="eo" />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/pembayaran" element={<VirtualAccountPage />} />
         <Route path="/pesanan/selesai" element={<KonfirmasiPage />} />
+        {/* Sisi vendor: sidebar sendiri, tanpa navbar/footer marketplace. */}
+        <Route path="/vendor" element={<VendorLayout />}>
+          <Route index element={<VendorDashboardPage />} />
+          <Route path="pemesanan" element={<VendorPemesananPage />} />
+          <Route path="jadwal" element={<VendorJadwalPage />} />
+          <Route path="layanan" element={<VendorLayananPage />} />
+          <Route path="keuangan" element={<VendorKeuanganPage />} />
+        </Route>
+
         <Route path="/masuk" element={<LoginPage />} />
         <Route path="/daftar" element={<RegisterPage />} />
       </Routes>

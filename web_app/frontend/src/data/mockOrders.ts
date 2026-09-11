@@ -19,10 +19,16 @@ export type OrderSummary = {
   backTo: string
 }
 
-/** Mockup menulis "Deposit(5%)" tapi angkanya 45.000 dari 300.000 = 15%.
- *  Dipakai 15% supaya cocok dengan total di mockup; ubah di sini kalau
- *  DP yang benar memang 5%. */
-export const DEPOSIT_RATE = 0.15
+/** DP 30%, mengikuti DP_RATE di backend (`booking.controller.js`). Backend yang
+ *  jadi sumber kebenaran — dia yang menghitung `dp_amount` dan yang menagih ke
+ *  Midtrans. Nilai di sini cuma untuk halaman yang datanya masih mock.
+ *
+ *  Catatan: mockup Figma menulis "Deposit(5%)" dengan angka 45.000 dari 300.000
+ *  (= 15%), dua-duanya tidak cocok dengan 30%. Angka mockup diabaikan karena
+ *  kalau beda dengan backend, user ditagih jumlah yang tidak dia lihat.
+ *  Begitu halaman checkout disambung ke API, baca `dp_amount` dari response
+ *  booking dan hapus konstanta ini. */
+export const DEPOSIT_RATE = 0.3
 
 export const deposit = (price: number) => Math.round(price * DEPOSIT_RATE)
 

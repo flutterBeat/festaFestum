@@ -38,20 +38,31 @@ CREATE TYPE payment_type AS ENUM ('down_payment', 'settlement');
 
 CREATE TYPE payment_status AS ENUM ('pending', 'success', 'failed', 'refunded');
 
+CREATE TYPE vendor_document_type AS ENUM ('ktp', 'npwp', 'siup');
+
+CREATE TYPE vendor_document_status AS ENUM ('pending', 'approved', 'rejected');
+
 
 -- ------------------------------------------------------------
 -- USERS
 -- Akun login untuk customer maupun pemilik vendor (role membedakan)
 -- ------------------------------------------------------------
+-- name = nama panggilan/display, full_name = nama sesuai KTP untuk kontrak resmi.
 CREATE TABLE users (
-  user_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name          VARCHAR(150) NOT NULL,
-  email         VARCHAR(150) NOT NULL UNIQUE,
-  phone         VARCHAR(20) NOT NULL,
-  password_hash TEXT NOT NULL,
-  role          user_role NOT NULL DEFAULT 'customer',
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  user_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name               VARCHAR(150) NOT NULL,
+  full_name          VARCHAR(150),
+  email              VARCHAR(150) NOT NULL UNIQUE,
+  phone              VARCHAR(20) NOT NULL,
+  birth_date         DATE,
+  avatar_url         TEXT,
+  shipping_address   TEXT,
+  shipping_note      VARCHAR(200),
+  notification_prefs JSONB NOT NULL DEFAULT '{}'::jsonb,
+  password_hash      TEXT NOT NULL,
+  role               user_role NOT NULL DEFAULT 'customer',
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ------------------------------------------------------------
@@ -62,7 +73,7 @@ CREATE TABLE vendors (
   vendor_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_user_id         UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   business_name         VARCHAR(150) NOT NULL,
-  city                  jabodetabek_city NOT NULL,
+  city                  jabodetabek_city,  -- NULL selama pendaftaran vendor belum tuntas
   address               TEXT,
   description           TEXT,
   is_verified           BOOLEAN NOT NULL DEFAULT FALSE,
@@ -109,6 +120,24 @@ CREATE TABLE portfolio_images (
 );
 
 CREATE INDEX idx_portfolio_vendor ON portfolio_images (vendor_id);
+
+-- ------------------------------------------------------------
+-- VENDOR_DOCUMENTS
+-- Berkas legalitas (KTP/NPWP/SIUP) untuk proses "Festa Verified Vendor".
+-- Satu vendor punya maksimal satu berkas per jenis; unggah ulang menimpa.
+-- ------------------------------------------------------------
+CREATE TABLE vendor_documents (
+  document_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  vendor_id   UUID NOT NULL REFERENCES vendors(vendor_id) ON DELETE CASCADE,
+  doc_type    vendor_document_type NOT NULL,
+  file_name   VARCHAR(255) NOT NULL,
+  file_url    TEXT,
+  status      vendor_document_status NOT NULL DEFAULT 'pending',
+  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (vendor_id, doc_type)
+);
+
+CREATE INDEX idx_vendor_documents_vendor ON vendor_documents (vendor_id);
 
 -- ------------------------------------------------------------
 -- VENDOR_SCHEDULES
@@ -206,4 +235,7 @@ CREATE INDEX idx_reviews_vendor ON reviews (vendor_id);
 --    Filter GET /vendors?category= dilakukan lewat EXISTS ke services.
 -- 5. Batasan satu akun = satu vendor diterapkan di level aplikasi, bukan
 --    UNIQUE constraint, agar mudah dilonggarkan jika nanti dibutuhkan.
+-- 6. vendor_documents hanya menyimpan METADATA berkas (nama file & status
+--    kurasi). Isi filenya belum disimpan di mana pun; file_url menunggu
+--    object storage privat karena KTP/NPWP adalah data pribadi.
 -- ============================================================

@@ -83,12 +83,14 @@ async function login(req, res, next) {
   }
 }
 
+const PROFILE_COLUMNS = `user_id, name, full_name, email, phone, birth_date, avatar_url,
+          shipping_address, shipping_note, notification_prefs, role, created_at`;
+
 // GET /api/v1/auth/me (protected)
 async function me(req, res, next) {
   try {
     const result = await pool.query(
-      `SELECT user_id, name, email, phone, role, created_at
-       FROM users WHERE user_id = $1`,
+      `SELECT ${PROFILE_COLUMNS} FROM users WHERE user_id = $1`,
       [req.user.user_id]
     );
 
@@ -103,4 +105,58 @@ async function me(req, res, next) {
   }
 }
 
-module.exports = { register, login, me };
+// PATCH /api/v1/auth/me (protected)
+// Hanya field profil. email, password, dan role sengaja TIDAK bisa diubah di
+// sini: ganti email butuh verifikasi ulang, ganti password butuh password lama,
+// dan role yang bisa diubah sendiri = eskalasi hak akses.
+const EDITABLE_PROFILE_FIELDS = [
+  'name', 'full_name', 'phone', 'birth_date', 'avatar_url',
+  'shipping_address', 'shipping_note', 'notification_prefs',
+];
+
+async function updateMe(req, res, next) {
+  try {
+    const sets = [];
+    const values = [];
+
+    for (const field of EDITABLE_PROFILE_FIELDS) {
+      if (!(field in req.body)) continue;
+      let value = req.body[field];
+
+      if (field === 'notification_prefs') {
+        if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+          return res.status(400).json({ message: 'notification_prefs harus berupa object' });
+        }
+        value = JSON.stringify(value);
+      } else if (value === '') {
+        value = null; // field dikosongkan dari form
+      }
+
+      values.push(value);
+      sets.push(`${field} = $${values.length}`);
+    }
+
+    if (sets.length === 0) {
+      return res.status(400).json({ message: 'Tidak ada field profil yang diubah' });
+    }
+
+    values.push(req.user.user_id);
+
+    const result = await pool.query(
+      `UPDATE users SET ${sets.join(', ')}, updated_at = now()
+       WHERE user_id = $${values.length}
+       RETURNING ${PROFILE_COLUMNS}`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User tidak ditemukan' });
+    }
+
+    res.json({ user: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { register, login, me, updateMe };
