@@ -1,24 +1,30 @@
+import { useEffect, useState } from 'react'
 import { VendorPageHeader, StatusPill } from '../components/VendorLayout'
 import {
   ArrowRight, DownloadIcon, FilterIcon, InfoIcon, LockIcon, WalletIcon,
 } from '../components/icons'
 import { rupiahBulat } from '../lib/format'
+import {
+  getVendorBalance, listVendorBookings,
+  type ApiBooking, type VendorBalance,
+} from '../lib/api'
 
 /** Arus kas vendor: saldo yang bisa ditarik, dana yang masih ditahan escrow,
  *  dan riwayat transaksinya.
  *
- *  Seluruh angka masih contoh. Escrow-nya sendiri belum ada — dananya baru
- *  benar-benar bergerak setelah payment gateway tersambung, karena rilis dari
- *  escrow ke saldo dipicu oleh pelunasan + konfirmasi penyelesaian acara.
+ *  Angkanya DITURUNKAN dari tabel payments (GET /bookings/vendor/balance),
+ *  bukan disimpan sebagai kolom saldo — kolom saldo gampang melenceng dari
+ *  kenyataan kalau ada satu update yang terlewat.
+ *
+ *  Aturannya: pembayaran sukses masih ESCROW selama acaranya belum lewat;
+ *  setelah tanggal acara terlampaui, dana masuk saldo tersedia dikurangi
+ *  biaya platform.
+ *
+ *  CATATAN: tombol "Tarik Dana" belum berfungsi. Tabel payouts dan alur
+ *  approval admin belum dibuat — menunggu keputusan soal endpoint /admin.
  */
 
-const PLATFORM_FEE_RATE = 0.025
 
-const balance = {
-  available: 24_500_000,
-  inEscrow: 12_850_000,
-  escrowOrders: 3,
-}
 
 type Row = {
   id: string
@@ -28,23 +34,66 @@ type Row = {
   status: 'Released' | 'In Escrow' | 'Withdrawn'
 }
 
-const history: Row[] = [
-  { id: 'TRX-9821-FESTA', client: 'Wedding - Sarah & John', date: '12 Okt 2026', amount: 15_000_000, status: 'Released' },
-  { id: 'TRX-1044-FESTA', client: 'Corporate Gala - PT. Alpha', date: '15 Okt 2026', amount: 8_500_000, status: 'In Escrow' },
-  { id: 'TRX-1102-FESTA', client: 'Graduation Dinner - Elara', date: '18 Okt 2026', amount: 4_350_000, status: 'In Escrow' },
-  { id: 'WD-0019-BCA', client: 'Penarikan Dana ke Rekening', date: '05 Okt 2026', amount: -10_000_000, status: 'Withdrawn' },
-]
 
 const tone = { Released: 'info', 'In Escrow': 'warn', Withdrawn: 'muted' } as const
 
 /** Biaya platform tidak dikenakan pada penarikan dana, hanya pada pemasukan. */
 function feeLabel(row: Row) {
   if (row.amount < 0) return '-'
-  const fee = `- ${rupiahBulat(Math.round(row.amount * PLATFORM_FEE_RATE))}`
+  const fee = `- ${rupiahBulat(Math.round(row.amount * 0.025))}`
   return row.status === 'In Escrow' ? `(Estimasi) ${fee}` : fee
 }
 
 export default function VendorKeuanganPage() {
+  const [saldo, setSaldo] = useState<VendorBalance | null>(null)
+  const [pesanan, setPesanan] = useState<ApiBooking[]>([])
+  const [memuat, setMemuat] = useState(true)
+  const [galat, setGalat] = useState('')
+
+  useEffect(() => {
+    Promise.all([getVendorBalance(), listVendorBookings()])
+      .then(([a, b]) => {
+        setSaldo(a.balance)
+        setPesanan(b.data)
+      })
+      .catch((e) => setGalat(e.message))
+      .finally(() => setMemuat(false))
+  }, [])
+
+  if (memuat) {
+    return <p className="py-20 text-center text-[14px] text-muted">Memuat keuangan...</p>
+  }
+  if (galat || !saldo) {
+    return (
+      <p className="mt-8 border border-maroon/30 bg-maroon/5 px-5 py-4 text-[14px] text-maroon">
+        {galat || 'Data keuangan tidak tersedia.'}
+      </p>
+    )
+  }
+
+  const balance = {
+    available: saldo.saldo_tersedia,
+    inEscrow: saldo.escrow,
+    escrowOrders: saldo.pesanan_escrow,
+  }
+
+  // Riwayat dirakit dari pembayaran yang sudah sukses. Penarikan dana belum
+  // ada barisnya karena tabel payouts belum dibuat.
+  const today = new Date(new Date().toDateString())
+  const history: Row[] = pesanan.flatMap((b) =>
+    b.payments
+      .filter((p) => p.gateway_status === 'success')
+      .map((p) => ({
+        id: p.payment_id.slice(0, 8).toUpperCase(),
+        client: `${b.customer_name} - ${b.service_name}`,
+        date: new Date(b.event_date).toLocaleDateString('id-ID', {
+          day: '2-digit', month: 'short', year: 'numeric',
+        }),
+        amount: Number(p.amount),
+        status: new Date(b.event_date) < today ? 'Released' : 'In Escrow',
+      }))
+  )
+
   return (
     <>
       <VendorPageHeader
@@ -73,7 +122,9 @@ export default function VendorKeuanganPage() {
           <div className="mt-6 flex items-center gap-5 border-t border-line pt-5">
             <button
               type="button"
-              className="rounded-md bg-navy-900 px-5 py-2.5 text-[13px] font-semibold text-white"
+              disabled={!saldo.penarikan_aktif}
+              title="Penarikan dana belum tersedia — menunggu alur approval admin"
+              className="rounded-md bg-navy-900 px-5 py-2.5 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
             >
               Tarik Dana
             </button>
@@ -103,7 +154,7 @@ export default function VendorKeuanganPage() {
           </span>
           <p className="mt-3 text-[13px] font-semibold">Informasi Biaya Platform</p>
           <p className="mt-2 text-[13px] text-ink/75">
-            Biaya layanan platform sebesar <b>{PLATFORM_FEE_RATE * 100}%</b> dipotong secara otomatis
+            Biaya layanan platform sebesar <b>{saldo.platform_fee_rate * 100}%</b> dipotong secara otomatis
             saat dana dipindahkan dari Escrow ke Saldo Tersedia Anda.
           </p>
           <button type="button" className="mt-4 text-[13px] font-medium underline underline-offset-4">
@@ -139,7 +190,7 @@ export default function VendorKeuanganPage() {
                   <th className="px-6 py-4 font-medium">ID Transaksi / Klien</th>
                   <th className="px-6 py-4 font-medium">Tanggal</th>
                   <th className="px-6 py-4 font-medium">Nominal (Kotor)</th>
-                  <th className="px-6 py-4 font-medium">Biaya ({PLATFORM_FEE_RATE * 100}%)</th>
+                  <th className="px-6 py-4 font-medium">Biaya ({saldo.platform_fee_rate * 100}%)</th>
                   <th className="px-6 py-4 text-right font-medium">Status</th>
                 </tr>
               </thead>

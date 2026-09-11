@@ -1,6 +1,6 @@
 const express = require('express');
 const {
-  charge, webhook, listByBooking, simulate,
+  charge, webhook, listByBooking, getPayment, refresh, simulate,
 } = require('../controllers/payment.controller');
 const { requireAuth } = require('../middleware/authMiddleware');
 
@@ -12,6 +12,8 @@ router.post('/webhook', webhook);
 
 router.post('/charge', requireAuth, charge);
 router.get('/booking/:bookingId', requireAuth, listByBooking);
+router.get('/:paymentId', requireAuth, getPayment);
+router.post('/:paymentId/refresh', requireAuth, refresh);
 router.post('/:paymentId/simulate', requireAuth, simulate);
 
 module.exports = router;

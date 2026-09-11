@@ -190,4 +190,85 @@ async function holdSlot(req, res, next) {
   }
 }
 
-module.exports = { setSchedules, checkAvailability, holdSlot };
+// GET /api/v1/schedules/me?from=YYYY-MM-DD&to=YYYY-MM-DD  (role: vendor_owner)
+// Mengisi kalender di halaman Jadwal vendor.
+//
+// Rentang WAJIB dibatasi: tanpa `from`/`to` satu vendor dengan setahun slot
+// akan menarik ribuan baris untuk menggambar satu bulan.
+async function listMySchedules(req, res, next) {
+  try {
+    const { from, to } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({ message: 'from dan to wajib diisi (YYYY-MM-DD)' });
+    }
+    if (!isValidDate(from) || !isValidDate(to)) {
+      return res.status(400).json({ message: 'from dan to harus format YYYY-MM-DD' });
+    }
+    if (from > to) {
+      return res.status(400).json({ message: 'from tidak boleh setelah to' });
+    }
+
+    const vendor = await pool.query(
+      'SELECT vendor_id FROM vendors WHERE owner_user_id = $1',
+      [req.user.user_id]
+    );
+    if (vendor.rows.length === 0) {
+      return res.status(404).json({ message: 'Profil vendor belum dibuat' });
+    }
+
+    // Booking yang menempel di slot ikut dibawa, supaya kalender bisa
+    // menampilkan siapa yang memesan tanpa panggilan kedua.
+    const { rows } = await pool.query(
+      `SELECT sch.schedule_id, sch.event_date, sch.time_slot, sch.status,
+              b.booking_id, b.payment_status, u.name AS customer_name
+         FROM vendor_schedules sch
+         LEFT JOIN bookings b ON b.schedule_id = sch.schedule_id
+         LEFT JOIN users u    ON u.user_id     = b.user_id
+        WHERE sch.vendor_id = $1
+          AND sch.event_date BETWEEN $2::date AND $3::date
+        ORDER BY sch.event_date, sch.time_slot`,
+      [vendor.rows[0].vendor_id, from, to]
+    );
+
+    res.json({ data: rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// DELETE /api/v1/schedules/:scheduleId  (role: vendor_owner)
+// Menutup slot = menghapus barisnya, karena aturan tabel vendor_schedules
+// adalah "tidak ada baris berarti tidak menerima pesanan".
+//
+// Kepemilikan ikut di WHERE lewat subquery vendor, dan status HARUS masih
+// 'available': slot yang sudah dipesan tidak boleh hilang begitu saja karena
+// bookings mereferensikannya (ON DELETE RESTRICT juga akan menolak).
+async function deleteSchedule(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM vendor_schedules sch
+        WHERE sch.schedule_id = $1
+          AND sch.status = 'available'
+          AND sch.vendor_id IN (SELECT vendor_id FROM vendors WHERE owner_user_id = $2)
+        RETURNING sch.schedule_id`,
+      [req.params.scheduleId, req.user.user_id]
+    );
+
+    if (rows.length === 0) {
+      // Bisa berarti: bukan milik dia, tidak ada, atau sudah dipesan. Ketiganya
+      // dibalas 404 supaya tidak bocor slot mana yang ada dan milik siapa.
+      return res.status(404).json({
+        message: 'Slot tidak ditemukan atau sudah dipesan sehingga tidak bisa ditutup',
+      });
+    }
+
+    res.json({ message: 'Slot ditutup', schedule_id: rows[0].schedule_id });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  setSchedules, checkAvailability, holdSlot, listMySchedules, deleteSchedule,
+};

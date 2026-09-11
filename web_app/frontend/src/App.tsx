@@ -69,9 +69,9 @@ export default function App() {
         <Route path="/mua/:id/pesan" element={<VenueOrderPage kind="mua" />} />
         <Route path="/fotografer/:id/pesan" element={<VenueOrderPage kind="fotografer" />} />
         <Route path="/event-organizer/:id/pesan" element={<VenueOrderPage kind="eo" />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/pembayaran" element={<VirtualAccountPage />} />
-        <Route path="/pesanan/selesai" element={<KonfirmasiPage />} />
+        <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        <Route path="/pembayaran/:paymentId" element={<VirtualAccountPage />} />
+        <Route path="/pesanan/selesai/:bookingId" element={<KonfirmasiPage />} />
         {/* Sisi vendor: sidebar sendiri, tanpa navbar/footer marketplace. */}
         <Route path="/vendor" element={<VendorLayout />}>
           <Route index element={<VendorDashboardPage />} />

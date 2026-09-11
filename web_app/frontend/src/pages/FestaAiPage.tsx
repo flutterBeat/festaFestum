@@ -1,7 +1,37 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import Img from '../components/Img'
 import { ChevronDown, SearchIcon } from '../components/icons'
 import { rupiah } from '../lib/format'
+import { categories, namaKota, type CategoryKey } from '../data/categories'
+import { listVendors, type ApiVendor } from '../lib/api'
+
+const KATEGORI: Record<string, CategoryKey> = {
+  florist: 'florist',
+  makeup_artist: 'mua',
+  attire_rental: 'attire',
+  photographer: 'fotografer',
+  event_organizer: 'eo',
+}
+
+/** Fokus acara -> kategori vendor yang dicari. Dipakai sebagai pencocokan
+ *  SEMENTARA sampai AI Engineer menyediakan POST /api/v1/ai/recommend. */
+const FOKUS_KE_KATEGORI: Record<string, string> = {
+  Dekorasi: 'florist',
+  Dokumentasi: 'photographer',
+  Katering: 'event_organizer',
+  Hiburan: 'event_organizer',
+  Busana: 'attire_rental',
+  Rias: 'makeup_artist',
+}
+
+/** Batas atas budget, dibaca dari label pilihan di form. */
+const BATAS_BUDGET: Record<string, number> = {
+  'Rp 10.000.000 - 50.000.000': 50_000_000,
+  'Rp 50.000.000 - 100.000.000': 100_000_000,
+  'Rp 100.000.000 - 250.000.000': 250_000_000,
+  '> Rp 250.000.000': Number.MAX_SAFE_INTEGER,
+}
 
 const parameterFields = [
   { id: 'tipe', label: 'Tipe Acara', options: ['Pernikahan', 'Wisuda', 'Gala Dinner', 'Konferensi'] },
@@ -20,36 +50,46 @@ const parameterFields = [
 
 const fokusOptions = ['Dekorasi', 'Dokumentasi', 'Katering', 'Hiburan', 'Busana', 'Rias']
 
-// Hasil contoh sesuai mockup. Diganti hasil POST /api/v1/ai/recommend
-// (Smart Planner buatan AI Engineer) begitu servicenya siap.
-const rekomendasi = [
-  {
-    vendor: 'Nusantara Grand EO',
-    desc: 'Paket pernikahan dengan konsep elegan dan layanan acara yang lengkap.',
-    tag: '100-150 Orang',
-    price: 21000000,
-    image: '/img/eo-nusantara.jpg',
-  },
-  {
-    vendor: 'Ethereal Beauty MUA',
-    desc: 'Layanan tata rias profesional untuk menyempurnakan penampilan di hari spesial Anda.',
-    tag: '',
-    price: 15000000,
-    image: '/img/mua-velvet.jpg',
-  },
-  {
-    vendor: 'Kenangan Florist',
-    desc: 'Rangkaian bunga dan dekorasi floral untuk memperindah seluruh rangkaian acara.',
-    tag: '',
-    price: 3500000,
-    image: '/img/florist-kenangan.jpg',
-  },
-]
 
 export default function FestaAiPage() {
   const [fokus, setFokus] = useState<string[]>([])
+  const [budget, setBudget] = useState('')
+  const [rekomendasi, setRekomendasi] = useState<ApiVendor[]>([])
+  const [mencari, setMencari] = useState(false)
+  const [galat, setGalat] = useState('')
+  const [sudahCari, setSudahCari] = useState(false)
 
-  const total = rekomendasi.reduce((sum, r) => sum + r.price, 0)
+  const total = rekomendasi.reduce((sum, r) => sum + Number(r.price_start_from ?? 0), 0)
+
+  // Pencocokan SEMENTARA: ambil vendor teratas dari kategori yang dipilih,
+  // saring dengan batas budget. Ini BUKAN model rekomendasi — begitu AI
+  // Engineer menyediakan POST /api/v1/ai/recommend, ganti isi fungsi ini saja.
+  async function cariPaket() {
+    setMencari(true)
+    setGalat('')
+    try {
+      const kategoriDicari = fokus.length
+        ? [...new Set(fokus.map((f) => FOKUS_KE_KATEGORI[f]).filter(Boolean))]
+        : Object.keys(KATEGORI)
+
+      const hasil = await Promise.all(
+        kategoriDicari.map((c) => listVendors({ category: c, limit: 3 }))
+      )
+
+      const batas = BATAS_BUDGET[budget] ?? Number.MAX_SAFE_INTEGER
+      const semua = hasil
+        .flatMap((r) => r.data)
+        .filter((v) => Number(v.price_start_from ?? 0) <= batas)
+
+      semua.sort((a, b) => Number(b.rating_avg) - Number(a.rating_avg))
+      setRekomendasi(semua.slice(0, 5))
+    } catch (e) {
+      setGalat((e as Error).message)
+    } finally {
+      setMencari(false)
+      setSudahCari(true)
+    }
+  }
 
   const toggleFokus = (f: string) =>
     setFokus((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]))
@@ -72,6 +112,8 @@ export default function FestaAiPage() {
                 <div className="relative mt-2">
                   <select
                     id={f.id}
+                    value={f.id === 'budget' ? budget : undefined}
+                    onChange={f.id === 'budget' ? (e) => setBudget(e.target.value) : undefined}
                     className="h-12 w-full appearance-none rounded-sm border border-line bg-white px-4 pr-10 text-[15px] outline-none focus:border-navy-900"
                   >
                     {f.options.map((o) => (
@@ -105,13 +147,16 @@ export default function FestaAiPage() {
             ))}
           </div>
 
-          {/* Belum ada aksi — nyambung ke POST /api/v1/ai/recommend nanti. */}
+          {/* Sementara memakai pencocokan sederhana di frontend. Diganti
+              POST /api/v1/ai/recommend begitu AI Engineer menyediakannya. */}
           <button
             type="button"
-            className="mt-7 flex h-14 w-full items-center justify-center gap-3 rounded-sm bg-navy-900 text-[17px] font-semibold text-white transition-opacity hover:opacity-90"
+            onClick={cariPaket}
+            disabled={mencari}
+            className="mt-7 flex h-14 w-full items-center justify-center gap-3 rounded-sm bg-navy-900 text-[17px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             <SearchIcon className="h-5 w-5" />
-            Cari Paket
+            {mencari ? 'Mencari...' : 'Cari Paket'}
           </button>
         </aside>
 
@@ -121,35 +166,70 @@ export default function FestaAiPage() {
             <div>
               <h2 className="font-display text-[32px] font-semibold">Rekomendasi Festa AI</h2>
               <p className="mt-2 max-w-[500px] text-[14px] leading-relaxed text-ink/75">
-                Berdasarkan parameter acara yang Anda masukkan, Festa AI telah memilih beberapa paket
-                yang paling sesuai untuk Anda.
+                Berdasarkan parameter acara yang Anda masukkan, Festa AI memilih vendor yang paling
+                sesuai. Saat ini pencocokannya masih sederhana (kategori + budget + rating) sambil
+                menunggu model rekomendasi dari tim AI.
               </p>
             </div>
             <p className="font-display text-[24px] font-semibold">{rupiah(total)}</p>
           </div>
 
           <div className="mt-6 space-y-6">
-            {rekomendasi.map((r) => (
-              <article
-                key={r.vendor}
-                className="grid gap-6 rounded-sm border border-line bg-white p-4 sm:grid-cols-[320px_1fr]"
-              >
-                <Img src={r.image} alt={r.vendor} className="h-[200px] w-full object-cover" />
+            {rekomendasi.map((r) => {
+              const kat = categories[KATEGORI[r.categories[0]] ?? 'eo']
+              return (
+                <article
+                  key={r.vendor_id}
+                  className="grid gap-6 rounded-sm border border-line bg-white p-4 sm:grid-cols-[320px_1fr]"
+                >
+                  <Img
+                    alt={r.business_name}
+                    emoji={kat.emoji}
+                    tint={kat.tint}
+                    className="h-[200px] w-full object-cover"
+                  />
 
-                <div className="flex flex-col py-2 pr-2">
-                  <h3 className="font-display text-[26px] font-semibold">{r.vendor}</h3>
-                  <p className="mt-2 max-w-[420px] text-[14px] leading-relaxed text-ink/75">{r.desc}</p>
-                  {r.tag && (
+                  <div className="flex flex-col py-2 pr-2">
+                    <h3 className="font-display text-[26px] font-semibold">{r.business_name}</h3>
+                    <p className="mt-2 max-w-[420px] text-[14px] leading-relaxed text-ink/75">
+                      {r.description || 'Vendor ini belum menuliskan deskripsi.'}
+                    </p>
                     <span className="mt-3 w-fit rounded-sm bg-[#fdeceb] px-3 py-1.5 text-[13px] text-[#c0392b]">
-                      {r.tag}
+                      {kat.label} - {namaKota(r.city)} - rating {Number(r.rating_avg)}
                     </span>
-                  )}
-                  <p className="mt-auto pt-6 text-right font-display text-[24px] font-semibold">
-                    {rupiah(r.price)}
-                  </p>
-                </div>
-              </article>
-            ))}
+                    <div className="mt-auto flex items-end justify-between gap-4 pt-6">
+                      <Link
+                        to={`/${kat.slug}/${r.vendor_id}`}
+                        className="rounded-sm border border-line px-4 py-2 text-[13px] transition-colors hover:border-navy-900"
+                      >
+                        Lihat Profil
+                      </Link>
+                      <p className="font-display text-[24px] font-semibold">
+                        {rupiah(Number(r.price_start_from ?? 0))}
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
+
+            {galat && (
+              <p className="border border-maroon/30 bg-maroon/5 px-5 py-4 text-[14px] text-maroon">
+                {galat}
+              </p>
+            )}
+
+            {sudahCari && !mencari && rekomendasi.length === 0 && !galat && (
+              <p className="border border-line bg-white py-16 text-center text-[15px] text-muted">
+                Tidak ada vendor yang cocok dengan parameter itu. Coba longgarkan budget atau fokusnya.
+              </p>
+            )}
+
+            {!sudahCari && (
+              <p className="border border-line bg-white py-16 text-center text-[15px] text-muted">
+                Atur parameter acara di sebelah kiri, lalu tekan "Cari Paket".
+              </p>
+            )}
           </div>
         </section>
       </div>

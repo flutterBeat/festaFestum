@@ -1,7 +1,12 @@
+import { useEffect, useState } from 'react'
 import Img from '../components/Img'
 import SearchPanel, { type Field } from '../components/SearchPanel'
 import VendorCard, { type Vendor } from '../components/VendorCard'
 import AiBanner from '../components/AiBanner'
+import { listVendors } from '../lib/api'
+import { categories, namaKota } from '../data/categories'
+
+const kategori = categories.attire
 
 const searchFields: Field[] = [
   {
@@ -21,18 +26,33 @@ const searchFields: Field[] = [
   },
 ]
 
-// Data contoh sesuai mockup. Diganti hasil GET /api/v1/vendors?category=attire
-// begitu halaman ini disambungkan ke backend.
-const vendors: Vendor[] = [
-  { id: 'elegant-suit', name: 'Elegant Suit House', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 700000, image: '/img/attire-elegant.jpg' },
-  { id: 'javanesse', name: 'Javanesse Attire', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 1200000, image: '/img/attire-javanesse.jpg' },
-  { id: 'otentik', name: 'Otentik Fashion', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 700000, image: '/img/attire-otentik.jpg' },
-  { id: 'luxe', name: 'Luxe Fashion House', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 1800000, image: '/img/attire-luxe.jpg' },
-  { id: 'tenun-indah', name: 'Tenun Indah Attire', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 1000000, image: '/img/attire-tenun.jpg' },
-  { id: 'xtravaganza', name: 'Xtravaganza Attire', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 2500000, image: '/img/attire-xtravaganza.jpg' },
-]
 
 export default function AttirePage() {
+  const [vendors, setVendors] = useState<Vendor[]>([])
+  const [memuat, setMemuat] = useState(true)
+  const [galat, setGalat] = useState('')
+
+  useEffect(() => {
+    listVendors({ category: kategori.apiCategory })
+      .then((r) =>
+        // Perhatikan kunci `data`, bukan `vendors`.
+        setVendors(
+          r.data.map((v) => ({
+            id: v.vendor_id,
+            name: v.business_name,
+            city: namaKota(v.city),
+            rating: Number(v.rating_avg),
+            ratingCount: v.rating_count,
+            priceFrom: Number(v.price_start_from ?? 0),
+            emoji: kategori.emoji,
+            tint: kategori.tint,
+          }))
+        )
+      )
+      .catch((e) => setGalat(e.message))
+      .finally(() => setMemuat(false))
+  }, [])
+
   return (
     <>
       {/* HERO */}
@@ -41,6 +61,8 @@ export default function AttirePage() {
           <Img
             src="/img/hero-attire.jpg"
             alt="Busana formal tradisional"
+            emoji={kategori.emoji}
+            tint={kategori.tint}
             className="h-full w-full object-cover"
           />
         </div>
@@ -54,9 +76,23 @@ export default function AttirePage() {
       <section className="mx-auto max-w-[1330px] px-6 pt-10 md:px-12">
         <h2 className="font-display text-[32px] font-semibold">Pilihan Jas/Kebaya</h2>
 
+        {memuat && <p className="mt-7 text-[14px] text-muted">Memuat penyedia jas & kebaya…</p>}
+
+        {galat && (
+          <p className="mt-7 border border-line bg-white px-5 py-4 text-[14px] text-ink/80">
+            {galat}
+          </p>
+        )}
+
+        {!memuat && !galat && vendors.length === 0 && (
+          <p className="mt-7 text-[14px] text-muted">
+            Belum ada penyedia jas & kebaya terdaftar. Isi datanya lewat <code>seed-vendors.js</code> di backend.
+          </p>
+        )}
+
         <div className="mt-7 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
           {vendors.map((v) => (
-            <VendorCard key={v.id} vendor={v} to={`/jas-kebaya/${v.id}`} />
+            <VendorCard key={v.id} vendor={v} to={`/${kategori.slug}/${v.id}`} />
           ))}
         </div>
       </section>

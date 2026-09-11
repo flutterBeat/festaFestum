@@ -27,8 +27,97 @@ if (enabled) {
   console.warn('[midtrans] MIDTRANS_SERVER_KEY kosong — mode simulasi, tidak ada transaksi nyata');
 }
 
-// Bank yang didukung lewat Bank Transfer / VA di sandbox.
-const SUPPORTED_BANKS = ['bca', 'bni', 'bri', 'permata', 'cimb'];
+// Ambil URL dari array `actions` yang dikirim Midtrans untuk QRIS/GoPay.
+const action = (res, name) => {
+  const found = (res.actions || []).find((a) => a.name === name);
+  return found ? found.url : null;
+};
+
+// Semua metode pembayaran yang didukung, dalam satu tabel.
+//
+//   build(amount) -> potongan request yang khas metode ini
+//   extract(res)  -> apa yang harus disimpan & ditampilkan ke user
+//
+// Ditaruh sebagai tabel, bukan rentetan if, karena 10 metode cuma beda dua
+// baris itu saja. Kartu kredit SENGAJA tidak ada: dia butuh SDK tokenisasi di
+// browser dan alur 3DS, jadi bukan sekadar satu entri di sini. Paylater
+// (Akulaku/Kredivo) sudah diuji jalan tapi dikeluarkan atas permintaan user.
+const METHODS = {
+  // --- Virtual Account: payment_type 'bank_transfer' ---------------------
+  bca_va: {
+    label: 'BCA Virtual Account',
+    build: () => ({ payment_type: 'bank_transfer', bank_transfer: { bank: 'bca' } }),
+    extract: (r) => ({ bank: 'bca', va_number: (r.va_numbers || [])[0]?.va_number || null }),
+  },
+  bni_va: {
+    label: 'BNI Virtual Account',
+    build: () => ({ payment_type: 'bank_transfer', bank_transfer: { bank: 'bni' } }),
+    extract: (r) => ({ bank: 'bni', va_number: (r.va_numbers || [])[0]?.va_number || null }),
+  },
+  bri_va: {
+    label: 'BRI Virtual Account',
+    build: () => ({ payment_type: 'bank_transfer', bank_transfer: { bank: 'bri' } }),
+    extract: (r) => ({ bank: 'bri', va_number: (r.va_numbers || [])[0]?.va_number || null }),
+  },
+  cimb_va: {
+    label: 'CIMB Virtual Account',
+    build: () => ({ payment_type: 'bank_transfer', bank_transfer: { bank: 'cimb' } }),
+    extract: (r) => ({ bank: 'cimb', va_number: (r.va_numbers || [])[0]?.va_number || null }),
+  },
+  // Permata menaruh nomornya di field sendiri, bukan di array va_numbers.
+  permata_va: {
+    label: 'Permata Virtual Account',
+    build: () => ({ payment_type: 'bank_transfer', bank_transfer: { bank: 'permata' } }),
+    extract: (r) => ({ bank: 'permata', va_number: r.permata_va_number || null }),
+  },
+  // Mandiri bukan 'bank_transfer' dan TIDAK punya nomor VA — yang keluar
+  // bill_key + biller_code. Baru bisa ditampung setelah kolom details JSONB.
+  mandiri_bill: {
+    label: 'Mandiri Bill Payment',
+    build: () => ({
+      payment_type: 'echannel',
+      echannel: { bill_info1: 'Pembayaran', bill_info2: 'Festa Festum' },
+    }),
+    extract: (r) => ({ bill_key: r.bill_key || null, biller_code: r.biller_code || null }),
+  },
+
+  // --- E-money: QR ditampilkan dari URL, tanpa SDK frontend --------------
+  qris: {
+    label: 'QRIS',
+    build: () => ({ payment_type: 'qris' }),
+    extract: (r) => ({ qr_url: action(r, 'generate-qr-code') }),
+  },
+  // Dibayar lewat QRIS, notifikasinya datang sebagai payment_type 'qris'.
+  gopay: {
+    label: 'GoPay',
+    build: () => ({ payment_type: 'gopay' }),
+    extract: (r) => ({
+      qr_url: action(r, 'generate-qr-code'),
+      deeplink: action(r, 'deeplink-redirect'),
+    }),
+  },
+
+  // --- Gerai: payment_type 'cstore', user bawa kode ke kasir -------------
+  indomaret: {
+    label: 'Indomaret',
+    build: () => ({
+      payment_type: 'cstore',
+      cstore: { store: 'indomaret', message: 'Festa Festum' },
+    }),
+    extract: (r) => ({ payment_code: r.payment_code || null, store: 'indomaret' }),
+  },
+  alfamart: {
+    label: 'Alfamart',
+    build: () => ({
+      payment_type: 'cstore',
+      cstore: { store: 'alfamart', message: 'Festa Festum' },
+    }),
+    extract: (r) => ({ payment_code: r.payment_code || null, store: 'alfamart' }),
+  },
+
+};
+
+const METHOD_IDS = Object.keys(METHODS);
 
 // Midtrans menandatangani notifikasi dengan SHA512 dari empat nilai yang
 // digabung, BUKAN dari raw body. Jadi webhook-nya aman diparse express.json().
@@ -60,4 +149,4 @@ function mapStatus(transactionStatus, fraudStatus) {
   return 'pending';
 }
 
-module.exports = { core, enabled, verifySignature, mapStatus, SUPPORTED_BANKS };
+module.exports = { core, enabled, verifySignature, mapStatus, METHODS, METHOD_IDS };

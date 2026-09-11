@@ -1,24 +1,161 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import OrderLayout, { OrderField, OrderSection, OrderTextarea } from '../components/OrderLayout'
 import { CalendarIcon, ChevronDown, NoteIcon } from '../components/icons'
-import { orders } from '../data/mockOrders'
+import { categories } from '../data/categories'
+import {
+  getVendor, getVendorServices, buatBooking,
+  type ApiService, type ApiVendor,
+} from '../lib/api'
+
+const kat = categories.attire
 
 const sizes = ['S', 'M', 'L', 'XL', 'XLL']
 const colors = ['Hitam', 'Navy', 'Hijau tua']
 
+/** Sewa busana tidak punya "jenis acara" di mockup, tapi POST /bookings
+ *  mewajibkannya. 'wedding' dipakai sebagai default karena itu yang paling
+ *  umum untuk jas & kebaya; user tetap bisa mengubahnya. */
+const JENIS_ACARA = [
+  { value: 'wedding', label: 'Pernikahan' },
+  { value: 'engagement', label: 'Lamaran' },
+  { value: 'graduation', label: 'Wisuda' },
+  { value: 'gala_dinner', label: 'Gala Dinner' },
+  { value: 'corporate_seminar', label: 'Seminar / Korporat' },
+]
+
 export default function AttireOrderPage() {
-  const [fitting, setFitting] = useState(true)
+  const { id = '' } = useParams()
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+
+  const [vendor, setVendor] = useState<ApiVendor | null>(null)
+  const [layanan, setLayanan] = useState<ApiService[]>([])
+  const [memuat, setMemuat] = useState(true)
+  const [galat, setGalat] = useState('')
+  const [mengirim, setMengirim] = useState(false)
+
+  // Dibawa dari halaman detail.
+  const [serviceId, setServiceId] = useState(params.get('service') ?? '')
+  const [ukuran, setUkuran] = useState(params.get('size') ?? '')
+  const [tglSewa, setTglSewa] = useState(params.get('date') ?? '')
+  const [tglAmbil, setTglAmbil] = useState(params.get('ambil') ?? '')
+  const [fitting, setFitting] = useState(params.get('fitting') !== 'false')
+  const [tglFitting, setTglFitting] = useState(params.get('tglFitting') ?? '')
+
+  const [warna, setWarna] = useState('')
+  const [jamFitting, setJamFitting] = useState('')
+  const [jenisAcara, setJenisAcara] = useState(JENIS_ACARA[0].value)
+  const [catatan, setCatatan] = useState('')
+
+  useEffect(() => {
+    Promise.all([getVendor(id), getVendorServices(id)])
+      .then(([r, s]) => {
+        const aktif = s.data.filter((x) => x.is_active)
+        setVendor(r.vendor)
+        setLayanan(aktif)
+        if (!params.get('service') && aktif[0]) setServiceId(aktif[0].service_id)
+      })
+      .catch((e) => setGalat(e.message))
+      .finally(() => setMemuat(false))
+  }, [id, params])
+
+  const paket = layanan.find((s) => s.service_id === serviceId) ?? layanan[0]
+  const harga = paket ? Number(paket.price) : 0
+
+  async function ajukan() {
+    setGalat('')
+    if (!paket) return setGalat('Vendor ini belum punya layanan aktif.')
+    if (!tglSewa) return setGalat('Tanggal sewa wajib diisi.')
+    if (!ukuran) return setGalat('Ukuran wajib dipilih.')
+
+    // Tabel bookings tidak punya kolom ukuran/warna/fitting. Semuanya
+    // dititipkan ke event_location_detail; menambah kolom demi satu kategori
+    // bukan tukar-tambah yang sepadan menjelang tenggat.
+    const detail = [
+      `Sewa ${kat.label} — ukuran ${ukuran}${warna ? `, warna ${warna}` : ''}`,
+      tglAmbil && `Pengambilan: ${tglAmbil}`,
+      fitting
+        ? `Fitting: ${tglFitting || 'tanggal menyusul'}${jamFitting ? ` ${jamFitting}` : ''}`
+        : 'Tanpa fitting',
+      catatan.trim() && `Catatan: ${catatan.trim()}`,
+    ].filter(Boolean).join('\n')
+
+    setMengirim(true)
+    try {
+      const r = await buatBooking({
+        service_id: paket.service_id,
+        event_date: tglSewa,
+        // Penyewaan busana tidak mengenal shift; 'pagi' dipakai konsisten
+        // dengan halaman detail supaya slot yang dicek dan yang dipesan sama.
+        time_slot: params.get('slot') ?? 'pagi',
+        event_type: jenisAcara,
+        event_location_detail: detail,
+      })
+      navigate(`/checkout/${r.booking.booking_id}`)
+    } catch (e) {
+      setGalat((e as Error).message)
+    } finally {
+      setMengirim(false)
+    }
+  }
+
+  if (memuat) {
+    return <p className="mx-auto max-w-[1330px] px-6 py-20 text-[14px] text-muted">Memuat…</p>
+  }
+  if (!vendor) {
+    return <p className="mx-auto max-w-[1330px] px-6 py-20 text-[15px]">{galat || 'Vendor tidak ditemukan.'}</p>
+  }
 
   return (
-    <OrderLayout order={orders.attire}>
+    <OrderLayout
+      order={{
+        vendor: vendor.business_name,
+        packageName: paket?.service_name ?? 'Belum ada paket',
+        price: harga,
+        dp: Math.round(harga * 0.3),
+        emoji: kat.emoji,
+        tint: kat.tint,
+        backTo: `/${kat.slug}/${id}`,
+      }}
+      onSubmit={ajukan}
+      mengirim={mengirim}
+      galat={galat}
+    >
       {/* Sewa busana tidak punya lokasi acara — yang dibutuhkan ukuran,
           warna, dan tiga tanggal (sewa, pengambilan, fitting). */}
       <OrderSection title="Informasi Acara" icon={<CalendarIcon />}>
+        {layanan.length > 1 && (
+          <div className="mb-5">
+            <Select
+              id="paket" label="PAKET YANG DISEWA"
+              value={serviceId} onChange={setServiceId}
+              options={layanan.map((s) => ({ value: s.service_id, label: s.service_name }))}
+            />
+          </div>
+        )}
+
         <div className="grid gap-5 sm:grid-cols-2">
-          <Select id="ukuran" label="PILIH UKURAN" options={sizes} />
-          <Select id="warna" label="PILIH WARNA" options={colors} />
-          <OrderField id="tanggal-sewa" label="TANGGAL SEWA" type="date" />
-          <OrderField id="tanggal-ambil" label="TANGGAL  PENGAMBILAN" type="date" />
+          <Select
+            id="ukuran" label="PILIH UKURAN" value={ukuran} onChange={setUkuran}
+            options={sizes.map((s) => ({ value: s, label: s }))}
+          />
+          <Select
+            id="warna" label="PILIH WARNA" value={warna} onChange={setWarna}
+            options={colors.map((c) => ({ value: c, label: c }))}
+          />
+          <OrderField
+            id="tanggal-sewa" label="TANGGAL SEWA" type="date"
+            value={tglSewa} onChange={setTglSewa}
+          />
+          <OrderField
+            id="tanggal-ambil" label="TANGGAL  PENGAMBILAN" type="date"
+            value={tglAmbil} onChange={setTglAmbil}
+          />
+          <Select
+            id="jenis" label="JENIS ACARA" value={jenisAcara} onChange={setJenisAcara}
+            options={JENIS_ACARA}
+          />
         </div>
 
         <fieldset className="mt-6 flex items-center gap-6">
@@ -44,20 +181,34 @@ export default function AttireOrderPage() {
 
         {fitting && (
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <OrderField id="tanggal-fitting" label="TANGGAL  FITTING" type="date" />
-            <OrderField id="jam-fitting" label="JAM FITTING" type="time" />
+            <OrderField
+              id="tanggal-fitting" label="TANGGAL  FITTING" type="date"
+              value={tglFitting} onChange={setTglFitting}
+            />
+            <OrderField
+              id="jam-fitting" label="JAM FITTING" type="time"
+              value={jamFitting} onChange={setJamFitting}
+            />
           </div>
         )}
       </OrderSection>
 
       <OrderSection title="Catatan untuk Vendor" icon={<NoteIcon />}>
-        <OrderTextarea id="catatan" label="REQUEST KHUSUS" />
+        <OrderTextarea id="catatan" label="REQUEST KHUSUS" value={catatan} onChange={setCatatan} />
       </OrderSection>
     </OrderLayout>
   )
 }
 
-function Select({ id, label, options }: { id: string; label: string; options: string[] }) {
+function Select({
+  id, label, options, value, onChange,
+}: {
+  id: string
+  label: string
+  options: { value: string; label: string }[]
+  value: string
+  onChange: (v: string) => void
+}) {
   return (
     <div>
       <label htmlFor={id} className="block text-[11px] font-semibold tracking-[0.06em] text-ink/70">
@@ -66,14 +217,15 @@ function Select({ id, label, options }: { id: string; label: string; options: st
       <div className="relative">
         <select
           id={id}
-          defaultValue=""
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           className="mt-2 h-11 w-full appearance-none rounded-sm border border-line bg-white px-3 pr-9 text-[14px] outline-none focus:border-navy-900"
         >
           <option value="" disabled>
             Pilih…
           </option>
           {options.map((o) => (
-            <option key={o}>{o}</option>
+            <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
         <ChevronDown className="pointer-events-none absolute right-3 bottom-3.5 h-4 w-4 text-ink/50" />

@@ -1,66 +1,38 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { VendorPageHeader, StatusPill } from '../components/VendorLayout'
+import { shifts } from '../data/shifts'
 import { rupiahBulat } from '../lib/format'
+import { listVendorBookings, type ApiBooking } from '../lib/api'
 
-/** Daftar pesanan yang masuk ke vendor. Filternya bekerja di sisi klien
- *  karena datanya masih contoh; nanti jadi query ?status= ke API. */
+/** Jenis acara di DB pakai snake_case; ini tampilannya. */
+const JENIS: Record<string, string> = {
+  wedding: 'Pernikahan',
+  engagement: 'Lamaran',
+  graduation: 'Wisuda',
+  gala_dinner: 'Gala Dinner',
+  corporate_seminar: 'Seminar / Korporat',
+}
 
-type Status = 'Mendatang' | 'Selesai' | 'Dibatalkan'
-
-const tabs = ['Semua', 'Mendatang', 'Selesai', 'Dibatalkan'] as const
-
-const bookings: {
-  id: string
-  client: string
-  event: string
-  date: string
-  time: string
-  total: number
-  status: Status
-}[] = [
-  {
-    id: '#FST-2026-0891',
-    client: 'Keluarga Wiryawan',
-    event: 'Pernikahan Elegan',
-    date: '12 Nov 2026',
-    time: '15:00 - 22:00 WIB',
-    total: 45_000_000,
-    status: 'Mendatang',
-  },
-  {
-    id: '#FST-2026-0885',
-    client: 'PT. Gemilang Abadi',
-    event: 'Gala Dinner Perusahaan',
-    date: '20 Nov 2026',
-    time: '18:00 - 23:00 WIB',
-    total: 120_500_000,
-    status: 'Mendatang',
-  },
-  {
-    id: '#FST-2026-0812',
-    client: 'Bapak Susanto',
-    event: 'Wisuda Magister',
-    date: '02 Okt 2026',
-    time: '10:00 - 14:00 WIB',
-    total: 15_000_000,
-    status: 'Selesai',
-  },
-  {
-    id: '#FST-2026-0774',
-    client: 'Ibu Rahmawati',
-    event: 'Lamaran Adat',
-    date: '18 Sep 2026',
-    time: '09:00 - 13:00 WIB',
-    total: 8_750_000,
-    status: 'Dibatalkan',
-  },
-]
 
 const tone = { Mendatang: 'info', Selesai: 'muted', Dibatalkan: 'warn' } as const
 
 export default function VendorPemesananPage() {
   const [tab, setTab] = useState<(typeof tabs)[number]>('Semua')
-  const rows = tab === 'Semua' ? bookings : bookings.filter((b) => b.status === tab)
+  const [bookings, setBookings] = useState<ApiBooking[]>([])
+  const [memuat, setMemuat] = useState(true)
+  const [galat, setGalat] = useState('')
+
+  useEffect(() => {
+    listVendorBookings()
+      .then((r) => setBookings(r.data))
+      .catch((e) => setGalat(e.message))
+      .finally(() => setMemuat(false))
+  }, [])
+
+  const rows = useMemo(
+    () => (tab === 'Semua' ? bookings : bookings.filter((b) => statusPesanan(b) === tab)),
+    [bookings, tab]
+  )
 
   return (
     <>
@@ -100,36 +72,70 @@ export default function VendorPemesananPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((b) => (
-                <tr key={b.id} className="border-t border-line align-top">
-                  <td className="px-6 py-5 text-ink/80">{b.id}</td>
-                  <td className="px-6 py-5">
-                    <p className="font-display text-[17px] font-semibold">{b.client}</p>
-                    <p className="mt-0.5 text-[13px] text-ink/70">{b.event}</p>
-                  </td>
-                  <td className="px-6 py-5">
-                    <p className="font-semibold">{b.date}</p>
-                    <p className="mt-0.5 text-[13px] text-ink/70">{b.time}</p>
-                  </td>
-                  <td className="px-6 py-5 text-right font-semibold">{rupiahBulat(b.total)}</td>
-                  <td className="px-6 py-5">
-                    <StatusPill tone={tone[b.status]}>{b.status}</StatusPill>
-                  </td>
-                  <td className="px-6 py-5">
-                    <button
-                      type="button"
-                      className="rounded-md border border-line px-4 py-2 text-[13px] font-medium hover:border-ink"
-                    >
-                      Detail
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((b) => {
+                const st = statusPesanan(b)
+                const shift = shifts.find((x) => x.value === b.time_slot)
+                const dibayar = b.payments
+                  .filter((p) => p.gateway_status === 'success')
+                  .reduce((t, p) => t + Number(p.amount), 0)
 
-              {rows.length === 0 && (
+                return (
+                  <tr key={b.booking_id} className="border-t border-line align-top">
+                    <td className="px-6 py-5 text-ink/80">
+                      #{b.booking_id.slice(0, 8).toUpperCase()}
+                    </td>
+                    <td className="px-6 py-5">
+                      <p className="font-display text-[17px] font-semibold">{b.customer_name}</p>
+                      <p className="mt-0.5 text-[13px] text-ink/70">
+                        {JENIS[b.event_type] ?? b.event_type} - {b.service_name}
+                      </p>
+                      <p className="mt-0.5 text-[12px] text-muted">{b.customer_phone}</p>
+                    </td>
+                    <td className="px-6 py-5">
+                      <p className="font-semibold">
+                        {new Date(b.event_date).toLocaleDateString('id-ID', {
+                          day: '2-digit', month: 'short', year: 'numeric',
+                        })}
+                      </p>
+                      <p className="mt-0.5 text-[13px] text-ink/70">
+                        {shift ? shift.label + ' (' + shift.hours + ')' : b.time_slot}
+                      </p>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <p className="font-semibold">{rupiahBulat(Number(b.total_price))}</p>
+                      <p className="mt-0.5 text-[12px] text-muted">
+                        masuk {rupiahBulat(dibayar)}
+                      </p>
+                    </td>
+                    <td className="px-6 py-5">
+                      <StatusPill tone={tone[st]}>{st}</StatusPill>
+                    </td>
+                    <td className="px-6 py-5">
+                      <details className="[&_summary::-webkit-details-marker]:hidden">
+                        <summary className="cursor-pointer list-none rounded-md border border-line px-4 py-2 text-[13px] font-medium hover:border-ink">
+                          Detail
+                        </summary>
+                        <p className="mt-2 max-w-[280px] whitespace-pre-line text-[12px] leading-relaxed text-ink/75">
+                          {b.event_location_detail}
+                        </p>
+                      </details>
+                    </td>
+                  </tr>
+                )
+              })}
+
+              {memuat && (
                 <tr className="border-t border-line">
                   <td colSpan={6} className="px-6 py-10 text-center text-[14px] text-muted">
-                    Belum ada pesanan berstatus {tab.toLowerCase()}.
+                    Memuat pesanan...
+                  </td>
+                </tr>
+              )}
+
+              {!memuat && rows.length === 0 && (
+                <tr className="border-t border-line">
+                  <td colSpan={6} className="px-6 py-10 text-center text-[14px] text-muted">
+                    {galat || 'Belum ada pesanan pada filter ini.'}
                   </td>
                 </tr>
               )}

@@ -1,5 +1,17 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Img from '../components/Img'
+import { listVendors, type ApiVendor } from '../lib/api'
+import { categories, namaKota, type CategoryKey } from '../data/categories'
+
+/** Enum kategori backend -> kunci kategori frontend. */
+const KATEGORI: Record<string, CategoryKey> = {
+  florist: 'florist',
+  makeup_artist: 'mua',
+  attire_rental: 'attire',
+  photographer: 'fotografer',
+  event_organizer: 'eo',
+}
 import SearchPanel, { type Field } from '../components/SearchPanel'
 import AiBanner from '../components/AiBanner'
 import { StarIcon, ArrowRight } from '../components/icons'
@@ -41,6 +53,25 @@ const langkah = [
 ]
 
 export default function LandingPage() {
+  // Rekomendasi = tiga vendor dengan rating tertinggi. GET /vendors sudah
+  // mengurutkan berdasarkan rating_avg, jadi cukup ambil tiga teratas.
+  // Ini BUKAN rekomendasi AI — Smart Planner ada di halaman /festa-ai.
+  const [unggulan, setUnggulan] = useState<ApiVendor[]>([])
+
+  useEffect(() => {
+    Promise.all(
+      Object.keys(KATEGORI).map((c) => listVendors({ category: c, limit: 2 }))
+    )
+      .then((hasil) => {
+        const semua = hasil.flatMap((r) => r.data)
+        semua.sort((a, b) => Number(b.rating_avg) - Number(a.rating_avg))
+        setUnggulan(semua.slice(0, 3))
+      })
+      .catch(() => setUnggulan([]))
+  }, [])
+
+  const [besar, ...kecil] = unggulan
+
   return (
     <>
       {/* HERO */}
@@ -107,62 +138,69 @@ export default function LandingPage() {
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_0.85fr]">
           {/* Kartu besar */}
-          <article className="flex flex-col border border-line bg-white">
-            <Img
-              src="/img/vendor-epicurean.png"
-              alt="Epicurean Event & Co"
-              className="h-[290px] w-full object-cover"
-            />
-            <div className="flex flex-1 flex-col px-7 py-7">
-              <h3 className="font-display text-[30px] font-semibold">Epicurean Event &amp; Co</h3>
-              <div className="mt-3 flex items-center gap-4">
-                <span className="rounded-sm bg-maroon px-3 py-1 text-[11px] font-medium text-white">
-                  Event Organizer
-                </span>
-                <span className="flex items-center gap-1 text-[12px] text-ink/80">
-                  <StarIcon className="h-3.5 w-3.5 text-star" />
-                  4.9 (130 ulasan)
-                </span>
-              </div>
-              <button
-                type="button"
-                className="mt-auto w-full rounded-sm bg-navy-900 py-3.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
-              >
-                Lihat Detail
-              </button>
-            </div>
-          </article>
+          {besar && (() => {
+            const kat = categories[KATEGORI[besar.categories[0]] ?? 'eo']
+            return (
+              <article className="flex flex-col border border-line bg-white">
+                <Img
+                  alt={besar.business_name}
+                  emoji={kat.emoji}
+                  tint={kat.tint}
+                  className="h-[290px] w-full object-cover"
+                />
+                <div className="flex flex-1 flex-col px-7 py-7">
+                  <h3 className="font-display text-[30px] font-semibold">{besar.business_name}</h3>
+                  <div className="mt-3 flex items-center gap-4">
+                    <span className="rounded-sm bg-maroon px-3 py-1 text-[11px] font-medium text-white">
+                      {kat.label}
+                    </span>
+                    <span className="flex items-center gap-1 text-[12px] text-ink/80">
+                      <StarIcon className="h-3.5 w-3.5 text-star" />
+                      {Number(besar.rating_avg)} · {namaKota(besar.city)}
+                    </span>
+                  </div>
+                  <Link
+                    to={`/${kat.slug}/${besar.vendor_id}`}
+                    className="mt-auto w-full rounded-sm bg-navy-900 py-3.5 text-center text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
+                  >
+                    Lihat Detail
+                  </Link>
+                </div>
+              </article>
+            )
+          })()}
 
           {/* Dua kartu kecil */}
           <div className="grid gap-6">
-            {[
-              {
-                name: 'Botanica Florist',
-                city: 'Jakarta Selatan',
-                image: '/img/vendor-botanica.png',
-              },
-              { name: 'Aura Glow Artist', city: 'Depok', image: '/img/vendor-aura.png' },
-            ].map((v) => (
-              <article key={v.name} className="flex flex-col border border-line bg-white">
-                <Img src={v.image} alt={v.name} className="h-[150px] w-full object-cover" />
-                <div className="px-5 py-4">
-                  <div className="flex items-start justify-between">
-                    <h3 className="font-display text-[23px] font-semibold">{v.name}</h3>
-                    <span className="pt-1.5 text-[11px] font-semibold">{v.city}</span>
+            {kecil.map((v) => {
+              const kat = categories[KATEGORI[v.categories[0]] ?? 'eo']
+              return (
+                <article key={v.vendor_id} className="flex flex-col border border-line bg-white">
+                  <Img
+                    alt={v.business_name}
+                    emoji={kat.emoji}
+                    tint={kat.tint}
+                    className="h-[150px] w-full object-cover"
+                  />
+                  <div className="px-5 py-4">
+                    <div className="flex items-start justify-between">
+                      <h3 className="font-display text-[23px] font-semibold">{v.business_name}</h3>
+                      <span className="pt-1.5 text-[11px] font-semibold">{namaKota(v.city)}</span>
+                    </div>
+                    <span className="mt-1 flex items-center gap-1 text-[12px] text-ink/80">
+                      <StarIcon className="h-3.5 w-3.5 text-star" />
+                      {Number(v.rating_avg)} · {kat.label}
+                    </span>
+                    <Link
+                      to={`/${kat.slug}/${v.vendor_id}`}
+                      className="mt-4 inline-block rounded-sm border border-line px-4 py-1.5 text-[12px] transition-colors hover:border-navy-900"
+                    >
+                      Lihat Profil
+                    </Link>
                   </div>
-                  <span className="mt-1 flex items-center gap-1 text-[12px] text-ink/80">
-                    <StarIcon className="h-3.5 w-3.5 text-star" />
-                    4.9 (130 ulasan)
-                  </span>
-                  <button
-                    type="button"
-                    className="mt-4 rounded-sm border border-line px-4 py-1.5 text-[12px] transition-colors hover:border-navy-900"
-                  >
-                    Lihat Profil
-                  </button>
-                </div>
-              </article>
-            ))}
+                </article>
+              )
+            })}
           </div>
         </div>
       </section>

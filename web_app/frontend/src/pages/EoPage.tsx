@@ -1,7 +1,12 @@
+import { useEffect, useState } from 'react'
 import Img from '../components/Img'
 import SearchPanel, { type Field } from '../components/SearchPanel'
 import VendorCard, { type Vendor } from '../components/VendorCard'
 import AiBanner from '../components/AiBanner'
+import { listVendors } from '../lib/api'
+import { categories, namaKota } from '../data/categories'
+
+const kategori = categories.eo
 
 const searchFields: Field[] = [
   {
@@ -21,18 +26,33 @@ const searchFields: Field[] = [
   },
 ]
 
-// Data contoh sesuai mockup. Diganti hasil GET /api/v1/vendors?category=event_organizer
-// begitu halaman ini disambungkan ke backend.
-const vendors: Vendor[] = [
-  { id: 'nusantara-grand', name: 'Nusantara Grand EO', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 2500000, image: '/img/eo-nusantara.jpg' },
-  { id: 'quantum', name: 'Quantum Event House', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 2500000, image: '/img/eo-quantum.jpg' },
-  { id: 'brilliance', name: 'Brilliance Organizer', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 2500000, image: '/img/eo-brilliance.jpg' },
-  { id: 'xclusive', name: 'Xclusive Event House', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 2500000, image: '/img/eo-xclusive.jpg' },
-  { id: 'festive-glory', name: 'Festive Glory Planner', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 2500000, image: '/img/eo-festive.jpg' },
-  { id: 'lestari', name: 'Lestari Event Group', city: 'Jakarta Selatan', rating: 4.9, ratingCount: 130, priceFrom: 2500000, image: '/img/eo-lestari.jpg' },
-]
 
 export default function EoPage() {
+  const [vendors, setVendors] = useState<Vendor[]>([])
+  const [memuat, setMemuat] = useState(true)
+  const [galat, setGalat] = useState('')
+
+  useEffect(() => {
+    listVendors({ category: kategori.apiCategory })
+      .then((r) =>
+        // Perhatikan kunci `data`, bukan `vendors`.
+        setVendors(
+          r.data.map((v) => ({
+            id: v.vendor_id,
+            name: v.business_name,
+            city: namaKota(v.city),
+            rating: Number(v.rating_avg),
+            ratingCount: v.rating_count,
+            priceFrom: Number(v.price_start_from ?? 0),
+            emoji: kategori.emoji,
+            tint: kategori.tint,
+          }))
+        )
+      )
+      .catch((e) => setGalat(e.message))
+      .finally(() => setMemuat(false))
+  }, [])
+
   return (
     <>
       {/* HERO */}
@@ -41,6 +61,8 @@ export default function EoPage() {
           <Img
             src="/img/hero-eo.jpg"
             alt="Persiapan acara korporat di ballroom"
+            emoji={kategori.emoji}
+            tint={kategori.tint}
             className="h-full w-full object-cover"
           />
         </div>
@@ -54,9 +76,23 @@ export default function EoPage() {
       <section className="mx-auto max-w-[1330px] px-6 pt-10 md:px-12">
         <h2 className="font-display text-[32px] font-semibold">Pilihan Event Organizer</h2>
 
+        {memuat && <p className="mt-7 text-[14px] text-muted">Memuat event organizer…</p>}
+
+        {galat && (
+          <p className="mt-7 border border-line bg-white px-5 py-4 text-[14px] text-ink/80">
+            {galat}
+          </p>
+        )}
+
+        {!memuat && !galat && vendors.length === 0 && (
+          <p className="mt-7 text-[14px] text-muted">
+            Belum ada event organizer terdaftar. Isi datanya lewat <code>seed-vendors.js</code> di backend.
+          </p>
+        )}
+
         <div className="mt-7 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
           {vendors.map((v) => (
-            <VendorCard key={v.id} vendor={v} to={`/event-organizer/${v.id}`} />
+            <VendorCard key={v.id} vendor={v} to={`/${kategori.slug}/${v.id}`} />
           ))}
         </div>
       </section>

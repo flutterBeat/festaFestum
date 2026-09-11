@@ -1,30 +1,25 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import Img from '../components/Img'
 import VendorLocation from '../components/VendorLocation'
 import BackButton from '../components/BackButton'
 import { ArrowRight, CalendarIcon } from '../components/icons'
+import { categories, namaKota } from '../data/categories'
 import { rupiah } from '../lib/format'
+import {
+  getVendor, getVendorServices, cekKetersediaan,
+  type ApiService, type ApiVendor,
+} from '../lib/api'
 
-// Data contoh sesuai mockup. Diganti hasil GET /api/v1/vendors/:id begitu
-// halaman ini disambungkan ke backend.
-const v = {
-  name: 'Javanesse Attire',
-  badge: 'Sewa Jas/Kebaya',
-  about:
-    'Atelier Elegance menghadirkan perpaduan sempurna antara tradisi dan modernitas. Setiap potong jas dan kebaya dalam koleksi kami dirancang oleh perancang busana terkemuka, menggunakan material berkualitas tertinggi untuk memastikan kenyamanan dan tampilan memukau di hari istimewa Anda. Kami menyediakan layanan kustomisasi ukuran agar setiap pakaian memeluk tubuh Anda dengan sempurna.',
-  priceEstimate: 500000,
-  photos: [
-    { src: '/img/javanesse-1.jpg', alt: 'Jas hitam di butik' },
-    { src: '/img/javanesse-2.jpg', alt: 'Detail kain bordir' },
-    { src: '/img/javanesse-3.jpg', alt: 'Kebaya di depan cermin' },
-  ],
-  colors: [
-    { name: 'Hitam', hex: '#111111' },
-    { name: 'Navy', hex: '#1a3263' },
-    { name: 'Hijau tua', hex: '#2e4034' },
-  ],
-}
+const kat = categories.attire
+
+/** Warna tidak punya kolom di database — hiasan mockup yang dibiarkan statis. */
+const WARNA = [
+  { name: 'Hitam', hex: '#111111' },
+  { name: 'Navy', hex: '#1a3263' },
+  { name: 'Hijau tua', hex: '#2e4034' },
+]
+
 
 /** Jas dan kebaya dijual dari halaman yang sama — yang membedakan cuma
  *  panduan ukurannya, jadi tabelnya ikut kategori yang dipilih. */
@@ -64,31 +59,106 @@ function Toggle({ active, onClick, children }: { active: boolean; onClick: () =>
 }
 
 export default function AttireDetailPage() {
-  const [kategori, setKategori] = useState<'jas' | 'kebaya'>('jas')
+  const { id = '' } = useParams()
+  const navigate = useNavigate()
+
+  const [vendor, setVendor] = useState<ApiVendor | null>(null)
+  const [layanan, setLayanan] = useState<ApiService[]>([])
+  const [memuat, setMemuat] = useState(true)
+  const [galat, setGalat] = useState('')
+
+  const [jenis, setJenis] = useState<'jas' | 'kebaya'>('jas')
   const [size, setSize] = useState('')
-  const [color, setColor] = useState(v.colors[0].hex)
+  const [color, setColor] = useState(WARNA[0].hex)
   const [fitting, setFitting] = useState(true)
+  const [tglSewa, setTglSewa] = useState('')
+  const [tglAmbil, setTglAmbil] = useState('')
+  const [tglFitting, setTglFitting] = useState('')
+  const [cek, setCek] = useState<{ ada: boolean; alasan: string | null } | null>(null)
+  const [mengecek, setMengecek] = useState(false)
+
+  useEffect(() => {
+    Promise.all([getVendor(id), getVendorServices(id)])
+      .then(([r, s]) => {
+        setVendor(r.vendor)
+        setLayanan(s.data.filter((x) => x.is_active))
+      })
+      .catch((e) => setGalat(e.message))
+      .finally(() => setMemuat(false))
+  }, [id])
+
+  const utama = layanan[0]
+
+  // Jadwal sewa dipakai sebagai tanggal acara — itu hari busananya dipakai.
+  // Shift dikunci 'pagi': penyewaan busana tidak punya shift di mockup, tapi
+  // vendor_schedules menyimpan ketersediaan per shift.
+  async function lanjutkan() {
+    if (!utama) return
+    if (!tglSewa) {
+      setCek({ ada: false, alasan: 'Isi jadwal sewa dulu.' })
+      return
+    }
+    if (!size) {
+      setCek({ ada: false, alasan: 'Pilih ukuran dulu.' })
+      return
+    }
+
+    setMengecek(true)
+    try {
+      const r = await cekKetersediaan({
+        service_id: utama.service_id, event_date: tglSewa, time_slot: 'pagi',
+      })
+      setCek({ ada: r.available, alasan: r.reason })
+      if (r.available) {
+        const q = new URLSearchParams({
+          service: utama.service_id, date: tglSewa, slot: 'pagi',
+          jenis, size, color, fitting: String(fitting),
+          ambil: tglAmbil, ...(fitting && tglFitting ? { tglFitting } : {}),
+        })
+        navigate(`/${kat.slug}/${id}/pesan?${q}`)
+      }
+    } catch (e) {
+      setCek({ ada: false, alasan: (e as Error).message })
+    } finally {
+      setMengecek(false)
+    }
+  }
+
+  if (memuat) {
+    return <p className="mx-auto max-w-[1330px] px-6 py-20 text-[14px] text-muted">Memuat…</p>
+  }
+  if (galat || !vendor) {
+    return (
+      <div className="mx-auto max-w-[1330px] px-6 py-20">
+        <BackButton fallback={`/${kat.slug}`} />
+        <p className="mt-6 text-[15px]">{galat || 'Vendor tidak ditemukan.'}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-[1330px] px-6 pt-12 pb-20 md:px-12">
-      <BackButton fallback="/jas-kebaya" />
+      <BackButton fallback={`/${kat.slug}`} />
 
-      <h1 className="mt-5 font-display text-[38px] font-semibold">{v.name}</h1>
-      <p className="mt-2 text-[14px] text-[#2e6b52]">{v.badge}</p>
+      <h1 className="mt-5 font-display text-[38px] font-semibold">{vendor.business_name}</h1>
+      <p className="mt-2 text-[14px] text-[#2e6b52]">
+        {kat.label} · {namaKota(vendor.city)}
+        {vendor.is_verified && ' · Terverifikasi'}
+      </p>
 
       {/* GALERI: satu foto tinggi di kiri, dua bertumpuk di kanan. */}
       <section className="mt-6 grid gap-3 md:grid-cols-2">
-        <Img src={v.photos[0].src} alt={v.photos[0].alt} className="h-[400px] w-full object-cover md:h-[640px]" />
+        <Img alt={vendor.business_name} emoji={kat.emoji} tint={kat.tint} className="h-[400px] w-full object-cover md:h-[640px]" />
         <div className="grid gap-3">
-          <Img src={v.photos[1].src} alt={v.photos[1].alt} className="h-[200px] w-full object-cover md:h-[310px]" />
-          <Img src={v.photos[2].src} alt={v.photos[2].alt} className="h-[200px] w-full object-cover md:h-[318px]" />
+          <Img alt={`${vendor.business_name} 2`} emoji={kat.emoji} tint={kat.tint} className="h-[200px] w-full object-cover md:h-[310px]" />
+          <Img alt={`${vendor.business_name} 3`} emoji={kat.emoji} tint={kat.tint} className="h-[200px] w-full object-cover md:h-[318px]" />
         </div>
       </section>
 
       <div className="mt-14 grid gap-12 lg:grid-cols-[1fr_420px]">
         <div>
           <h2 className="font-display text-[17px] font-semibold">Tentang Koleksi</h2>
-          <p className="mt-4 max-w-[560px] text-[15px] leading-[1.85] text-ink/85">{v.about}</p>
+          <p className="mt-4 max-w-[560px] text-[15px] leading-[1.85] text-ink/85">{vendor.description || 'Vendor ini belum menuliskan deskripsi.'}</p>
 
           <h2 className="mt-12 border-t border-line pt-12 font-display text-[26px] font-semibold">
             Paduan Ukuran
@@ -99,7 +169,7 @@ export default function AttireDetailPage() {
           </p>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {sizeGuides[kategori].map((g) => (
+            {sizeGuides[jenis].map((g) => (
               <div key={g.size} className="border border-lavender bg-lavender/40 p-4">
                 <span className="inline-block rounded-sm bg-[#8f9bd4] px-2.5 py-0.5 text-[11px] font-bold text-white">
                   {g.size}
@@ -122,10 +192,10 @@ export default function AttireDetailPage() {
 
           <p className="mt-5 text-[15px] font-semibold">Pilihan Kategori</p>
           <div className="mt-2 flex gap-4">
-            <Toggle active={kategori === 'jas'} onClick={() => setKategori('jas')}>
+            <Toggle active={jenis === 'jas'} onClick={() => setJenis('jas')}>
               Jas
             </Toggle>
-            <Toggle active={kategori === 'kebaya'} onClick={() => setKategori('kebaya')}>
+            <Toggle active={jenis === 'kebaya'} onClick={() => setJenis('kebaya')}>
               Kebaya
             </Toggle>
           </div>
@@ -149,7 +219,7 @@ export default function AttireDetailPage() {
 
           <p className="mt-5 text-[15px] font-semibold">Pilih Warna</p>
           <div className="mt-2 flex gap-2">
-            {v.colors.map((c) => (
+            {WARNA.map((c) => (
               <button
                 key={c.hex}
                 type="button"
@@ -164,8 +234,8 @@ export default function AttireDetailPage() {
             ))}
           </div>
 
-          <DateField id="jadwal-sewa" label="Jadwal Sewa" defaultValue="2026-11-05" />
-          <DateField id="jadwal-ambil" label="Jadwal Pengambilan" defaultValue="2026-11-08" />
+          <DateField id="jadwal-sewa" label="Jadwal Sewa" value={tglSewa} onChange={(x) => { setTglSewa(x); setCek(null) }} />
+          <DateField id="jadwal-ambil" label="Jadwal Pengambilan" value={tglAmbil} onChange={setTglAmbil} />
 
           <p className="mt-5 text-[15px] font-semibold">Perlu Fitting?</p>
           <div className="mt-2 flex gap-4">
@@ -178,21 +248,30 @@ export default function AttireDetailPage() {
           </div>
 
           {/* Jadwal fitting hanya relevan kalau user memang mau fitting. */}
-          {fitting && <DateField id="jadwal-fitting" label="Jadwal Fitting" defaultValue="2026-11-03" />}
+          {fitting && (
+            <DateField id="jadwal-fitting" label="Jadwal Fitting" value={tglFitting} onChange={setTglFitting} />
+          )}
 
           <div className="mt-6 flex items-baseline justify-between border-t border-line pt-4">
             <span className="text-[14px] text-ink/80">Estimasi Harga Sewa</span>
-            <span className="font-display text-[19px] font-semibold">{rupiah(v.priceEstimate)}</span>
+            <span className="font-display text-[19px] font-semibold">{utama ? rupiah(Number(utama.price)) : '-'}</span>
           </div>
 
-          {/* Ukuran, warna & tanggal belum ikut terbawa — nanti lewat POST /schedules/hold. */}
-          <Link
-            to="pesan"
-            className="mt-4 flex h-11 w-full items-center justify-center gap-3 rounded-sm bg-amber text-[15px] font-semibold text-navy-900 transition-opacity hover:opacity-90"
+          {cek && !cek.ada && (
+            <p className="mt-4 border border-maroon/30 bg-maroon/5 px-3 py-2 text-[13px] text-maroon">
+              {cek.alasan || 'Slot tidak tersedia.'}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={lanjutkan}
+            disabled={mengecek || !utama}
+            className="mt-4 flex h-11 w-full items-center justify-center gap-3 rounded-sm bg-amber text-[15px] font-semibold text-navy-900 transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            Lanjutkan Pesanan
+            {mengecek ? 'Mengecek jadwal…' : 'Lanjutkan Pesanan'}
             <ArrowRight className="h-4 w-4" />
-          </Link>
+          </button>
         </aside>
       </div>
 
@@ -203,7 +282,10 @@ export default function AttireDetailPage() {
   )
 }
 
-function DateField({ id, label, defaultValue }: { id: string; label: string; defaultValue: string }) {
+function DateField(
+  { id, label, value, onChange }:
+  { id: string; label: string; value: string; onChange: (v: string) => void }
+) {
   return (
     <>
       <label htmlFor={id} className="mt-5 block text-[15px] font-semibold">
@@ -213,7 +295,8 @@ function DateField({ id, label, defaultValue }: { id: string; label: string; def
         <input
           id={id}
           type="date"
-          defaultValue={defaultValue}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           className="h-11 w-full rounded-sm border border-line bg-white px-3 pr-9 text-[14px] outline-none focus:border-navy-900"
         />
         <CalendarIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />

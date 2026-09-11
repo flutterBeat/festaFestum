@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { VendorPageHeader } from '../components/VendorLayout'
 import { ChevronDown } from '../components/icons'
 import { shifts } from '../data/shifts'
+import { listMySchedules, tambahSlot, kirim } from '../lib/api'
 
 /** Kalender ketersediaan vendor — sumber data untuk schedule-first discovery.
  *
@@ -14,15 +15,23 @@ import { shifts } from '../data/shifts'
  *  tiga nilai enum di DB. Membuka 'siang' dari sini percuma selama halaman
  *  detail vendor belum menawarkannya ke customer.
  *
- *  Perubahan masih di state komponen. Penyambungannya nanti:
+ *  Sudah tersambung ke backend:
+ *  baca       -> GET    /api/v1/schedules/me?from=&to=
  *  buka slot  -> POST   /api/v1/schedules
- *  tutup slot -> DELETE /api/v1/schedules/:id  (endpoint ini belum ada)
+ *  tutup slot -> DELETE /api/v1/schedules/:id
+ *
+ *  Perubahan dikirim ke server dulu, baru state lokal ikut. Kalau dibalik,
+ *  kalender bisa menampilkan slot terbuka yang sebenarnya gagal tersimpan.
  */
 
-type SlotStatus = 'available' | 'booked'
+type SlotStatus = 'available' | 'booked' | 'held' | 'blocked'
+
+/** Satu baris vendor_schedules yang dipegang kalender. `id` dibutuhkan untuk
+ *  menutup slot (DELETE butuh schedule_id, bukan tanggal + shift). */
+type Slot = { id: string; status: SlotStatus; customer: string | null }
 
 /** Kunci baris jadwal, sama bentuknya dengan (event_date, time_slot) di DB. */
-type Availability = Record<string, Partial<Record<string, SlotStatus>>>
+type Availability = Record<string, Partial<Record<string, Slot>>>
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -38,26 +47,14 @@ const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
 const today = new Date()
 today.setHours(0, 0, 0, 0)
 
-/** Contoh isi awal: beberapa tanggal sudah dibuka, satu sudah dipesan. */
-const seed: Availability = (() => {
-  const base = new Date(today)
-  const at = (plusDays: number) => {
-    const d = new Date(base)
-    d.setDate(d.getDate() + plusDays)
-    return iso(d)
-  }
-  return {
-    [at(5)]: { pagi: 'available', malam: 'available' },
-    [at(6)]: { malam: 'available' },
-    [at(12)]: { pagi: 'available', malam: 'booked' },
-    [at(19)]: { pagi: 'available', malam: 'available' },
-  }
-})()
 
 export default function VendorJadwalPage() {
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
-  const [availability, setAvailability] = useState<Availability>(seed)
+  const [availability, setAvailability] = useState<Availability>({})
   const [selected, setSelected] = useState<string | null>(null)
+  const [memuat, setMemuat] = useState(true)
+  const [galat, setGalat] = useState('')
+  const [sibuk, setSibuk] = useState('')
 
   const days = useMemo(() => {
     const first = new Date(month.getFullYear(), month.getMonth(), 1)
@@ -70,22 +67,63 @@ export default function VendorJadwalPage() {
     ]
   }, [month])
 
+  // Rentang dibatasi per bulan yang sedang dilihat — GET /schedules/me memang
+  // mewajibkan from & to supaya tidak menarik ribuan baris sekaligus.
+  const muat = useCallback(async () => {
+    const first = new Date(month.getFullYear(), month.getMonth(), 1)
+    const last = new Date(month.getFullYear(), month.getMonth() + 1, 0)
+    setMemuat(true)
+    setGalat('')
+    try {
+      const r = await listMySchedules(iso(first), iso(last))
+      const next: Availability = {}
+      for (const row of r.data) {
+        const tgl = row.event_date.slice(0, 10)
+        next[tgl] = {
+          ...(next[tgl] || {}),
+          [row.time_slot]: {
+            id: row.schedule_id,
+            status: row.status,
+            customer: row.customer_name,
+          },
+        }
+      }
+      setAvailability(next)
+    } catch (e) {
+      setGalat((e as Error).message)
+    } finally {
+      setMemuat(false)
+    }
+  }, [month])
+
+  useEffect(() => { muat() }, [muat])
+
   const openCount = Object.values(availability).reduce(
-    (n, slots) => n + Object.values(slots).filter((s) => s === 'available').length,
+    (n, slots) => n + Object.values(slots).filter((s) => s && s.status === 'available').length,
     0
   )
 
-  function toggle(date: string, shift: string) {
-    setAvailability((prev) => {
-      const slots = { ...(prev[date] || {}) }
-      if (slots[shift] === 'booked') return prev // sudah dipesan, tidak boleh ditutup
-      if (slots[shift] === 'available') delete slots[shift]
-      else slots[shift] = 'available'
+  async function toggle(date: string, shift: string) {
+    const kini = availability[date]?.[shift]
+    // Slot yang sudah dipesan atau sedang dipegang user lain tidak boleh
+    // ditutup dari sini; backend juga menolaknya.
+    if (kini && kini.status !== 'available') return
 
-      const next = { ...prev, [date]: slots }
-      if (Object.keys(slots).length === 0) delete next[date]
-      return next
-    })
+    setSibuk(date + shift)
+    setGalat('')
+    try {
+      if (kini) {
+        await kirim(`/schedules/${kini.id}`, 'DELETE')
+      } else {
+        await tambahSlot([{ event_date: date, time_slot: shift }])
+      }
+      // Muat ulang dari server, bukan menebak hasilnya di klien.
+      await muat()
+    } catch (e) {
+      setGalat((e as Error).message)
+    } finally {
+      setSibuk('')
+    }
   }
 
   const selectedSlots = selected ? availability[selected] || {} : {}
@@ -103,11 +141,18 @@ export default function VendorJadwalPage() {
         }
       />
 
+      {galat && (
+        <p className="mt-6 border border-maroon/30 bg-maroon/5 px-5 py-3 text-[13px] text-maroon">
+          {galat}
+        </p>
+      )}
+
       <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_320px]">
         <section className="rounded-lg border border-line bg-white p-6">
           <div className="flex items-center justify-between gap-4">
             <h2 className="font-display text-[22px] font-semibold">
               {monthNames[month.getMonth()]} {month.getFullYear()}
+              {memuat && <span className="ml-3 text-[13px] font-normal text-muted">memuat...</span>}
             </h2>
             <div className="flex gap-2">
               <MonthButton
@@ -154,11 +199,11 @@ export default function VendorJadwalPage() {
                 >
                   <span className="text-[13px] font-semibold">{date.getDate()}</span>
                   <span className="mt-auto flex gap-1">
-                    {values.map((status, n) => (
+                    {values.map((slot, n) => (
                       <span
                         key={n}
                         className={`h-1.5 w-1.5 rounded-full ${
-                          status === 'booked' ? 'bg-maroon' : 'bg-amber'
+                          slot && slot.status !== 'available' ? 'bg-maroon' : 'bg-amber'
                         }`}
                       />
                     ))}
@@ -194,14 +239,18 @@ export default function VendorJadwalPage() {
 
               <div className="mt-6 space-y-3">
                 {shifts.map((s) => {
-                  const status = selectedSlots[s.value]
-                  const booked = status === 'booked'
+                  const slot = selectedSlots[s.value]
+                  // 'held' = sedang dipegang user lain di checkout; sama-sama
+                  // tidak boleh ditutup vendor.
+                  const terkunci = !!slot && slot.status !== 'available'
+                  const terbuka = !!slot && slot.status === 'available'
+                  const sedang = sibuk === selected + s.value
 
                   return (
                     <div
                       key={s.value}
                       className={`flex items-center justify-between gap-3 rounded-md border p-4 ${
-                        booked ? 'border-maroon/40 bg-maroon/5' : 'border-line'
+                        terkunci ? 'border-maroon/40 bg-maroon/5' : 'border-line'
                       }`}
                     >
                       <div>
@@ -209,21 +258,25 @@ export default function VendorJadwalPage() {
                         <p className="text-[12px] text-ink/65">{s.hours}</p>
                       </div>
 
-                      {booked ? (
-                        <span className="rounded-full bg-maroon/10 px-3 py-1 text-[12px] font-medium text-maroon">
-                          Sudah dipesan
+                      {terkunci ? (
+                        <span className="rounded-full bg-maroon/10 px-3 py-1 text-right text-[12px] font-medium text-maroon">
+                          {slot.status === 'held' ? 'Sedang diproses' : 'Sudah dipesan'}
+                          {slot.customer && (
+                            <span className="block text-[11px] font-normal">{slot.customer}</span>
+                          )}
                         </span>
                       ) : (
                         <button
                           type="button"
+                          disabled={sedang}
                           onClick={() => toggle(selected, s.value)}
-                          className={`rounded-md px-4 py-2 text-[12px] font-semibold transition-colors ${
-                            status === 'available'
+                          className={`rounded-md px-4 py-2 text-[12px] font-semibold transition-colors disabled:opacity-50 ${
+                            terbuka
                               ? 'bg-amber text-navy-900'
                               : 'border border-line text-ink/70 hover:border-ink'
                           }`}
                         >
-                          {status === 'available' ? 'Terbuka' : 'Tutup'}
+                          {sedang ? 'Menyimpan...' : terbuka ? 'Terbuka' : 'Tutup'}
                         </button>
                       )}
                     </div>

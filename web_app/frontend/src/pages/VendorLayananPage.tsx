@@ -1,10 +1,15 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { VendorPageHeader } from '../components/VendorLayout'
 import Img from '../components/Img'
 import {
   ChevronDown, ClockIcon, EyeIcon, PhotoIcon, PlusIcon, UploadCloudIcon,
 } from '../components/icons'
 import { rupiahBulat } from '../lib/format'
+import { categories as katalogKategori } from '../data/categories'
+import {
+  getMyVendor, getVendorServices, tambahLayanan, kirim,
+  type ApiService,
+} from '../lib/api'
 
 /** Katalog layanan + galeri portofolio milik vendor.
  *
@@ -24,40 +29,25 @@ const categories = [
   { value: 'photographer', label: 'Fotografer' },
 ] as const
 
-type Service = {
-  id: string
+/** Bentuk data layanan mengikuti tabel services apa adanya (ApiService),
+ *  supaya tidak ada lapisan penerjemah yang bisa meleset. */
+type BaruLayanan = {
+  service_name: string
   category: string
-  name: string
   description: string
   price: number
-  noticeDays: number
-  image?: string
-  imageAlt?: string
+  minimum_notice_days: number
 }
 
-const initialServices: Service[] = [
-  {
-    id: 'full-service',
-    category: 'event_organizer',
-    name: 'Full-Service Orchestration',
-    description: 'Perencanaan komprehensif A-Z untuk acara korporat berskala besar.',
-    price: 75_000_000,
-    noticeDays: 30,
-    image: '/img/eo-gala-1.jpg',
-    imageAlt: 'Gala dinner korporat',
-  },
-  {
-    id: 'floral-design',
-    category: 'florist',
-    name: 'Conceptual Floral Design',
-    description:
-      'Instalasi bunga kustom yang dirancang khusus untuk mencerminkan identitas merek atau tema spesifik acara Anda.',
-    price: 15_000_000,
-    noticeDays: 7,
-    image: '/img/botanica-2.jpg',
-    imageAlt: 'Instalasi bunga kustom',
-  },
-]
+/** Emoji per kategori, dipakai sebagai pengganti foto layanan. */
+const EMOJI: Record<string, { emoji: string; tint: string }> = {
+  event_organizer: katalogKategori.eo,
+  florist: katalogKategori.florist,
+  attire_rental: katalogKategori.attire,
+  makeup_artist: katalogKategori.mua,
+  photographer: katalogKategori.fotografer,
+}
+
 
 const portfolio = [
   { src: '/img/eo-gala-1.jpg', alt: 'Ruang perjamuan penuh tamu' },
@@ -71,9 +61,40 @@ const categoryLabel = (value: string) =>
   categories.find((c) => c.value === value)?.label ?? value
 
 export default function VendorLayananPage() {
-  const [services, setServices] = useState(initialServices)
+  const [services, setServices] = useState<ApiService[]>([])
+  const [vendorId, setVendorId] = useState('')
   const [defaultNotice, setDefaultNotice] = useState(14)
+  const [memuat, setMemuat] = useState(true)
+  const [galat, setGalat] = useState('')
   const dialogRef = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    getMyVendor()
+      .then(async (r) => {
+        setVendorId(r.vendor.vendor_id)
+        const s = await getVendorServices(r.vendor.vendor_id)
+        setServices(s.data.filter((x) => x.is_active))
+      })
+      .catch((e) => setGalat(e.message))
+      .finally(() => setMemuat(false))
+  }, [])
+
+  async function tambah(baru: BaruLayanan) {
+    const r = await tambahLayanan(vendorId, baru)
+    setServices((prev) => [...prev, r.service])
+  }
+
+  // Hapus = soft delete di backend (is_active = false), karena booking lama
+  // masih mereferensikan baris layanan itu.
+  async function hapus(id: string) {
+    setGalat('')
+    try {
+      await kirim(`/services/${id}`, 'DELETE')
+      setServices((prev) => prev.filter((x) => x.service_id !== id))
+    } catch (e) {
+      setGalat((e as Error).message)
+    }
+  }
 
   return (
     <>
@@ -90,6 +111,12 @@ export default function VendorLayananPage() {
           </button>
         }
       />
+
+      {galat && (
+        <p className="mt-6 border border-maroon/30 bg-maroon/5 px-5 py-3 text-[13px] text-maroon">
+          {galat}
+        </p>
+      )}
 
       <div className="mt-8 grid gap-7 lg:grid-cols-[300px_1fr]">
         <section className="h-fit rounded-lg border border-line bg-white p-6">
@@ -152,42 +179,59 @@ export default function VendorLayananPage() {
           </h2>
 
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
-            {services.map((s) => (
-              <article key={s.id} className="overflow-hidden rounded-lg border border-line bg-white">
-                <div className="relative">
-                  <Img
-                    src={s.image ?? ''}
-                    alt={s.imageAlt ?? s.name}
-                    className="h-[165px] w-full object-cover"
-                  />
-                  <span className="absolute top-3 left-3 rounded bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-ink">
-                    {categoryLabel(s.category)}
-                  </span>
-                </div>
-                <div className="p-5">
-                  <h3 className="font-display text-[21px] leading-tight font-semibold">{s.name}</h3>
-                  <p className="mt-2 line-clamp-3 text-[13px] text-ink/70">{s.description}</p>
-                  <p className="mt-3 text-[12px] text-muted">
-                    Butuh pemesanan {s.noticeDays} hari sebelumnya
-                  </p>
-                  <div className="mt-4 flex items-end justify-between gap-3 border-t border-line pt-4">
-                    <div>
-                      <p className="text-[11px] font-semibold tracking-[0.04em] text-ink/60">
-                        Harga Mulai Dari
-                      </p>
-                      <p className="mt-0.5 text-[19px] font-semibold">{rupiahBulat(s.price)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label={`Pratinjau ${s.name}`}
-                      className="text-ink/50 hover:text-ink"
-                    >
-                      <EyeIcon />
-                    </button>
+            {services.map((s) => {
+              const gaya = EMOJI[s.category]
+              return (
+                <article key={s.service_id} className="overflow-hidden rounded-lg border border-line bg-white">
+                  <div className="relative">
+                    <Img
+                      alt={s.service_name}
+                      emoji={gaya?.emoji}
+                      tint={gaya?.tint}
+                      className="h-[165px] w-full object-cover"
+                    />
+                    <span className="absolute top-3 left-3 rounded bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-ink">
+                      {categoryLabel(s.category)}
+                    </span>
                   </div>
-                </div>
-              </article>
-            ))}
+                  <div className="p-5">
+                    <h3 className="font-display text-[21px] leading-tight font-semibold">
+                      {s.service_name}
+                    </h3>
+                    <p className="mt-2 line-clamp-3 text-[13px] text-ink/70">{s.description}</p>
+                    <p className="mt-3 text-[12px] text-muted">
+                      Butuh pemesanan {s.minimum_notice_days} hari sebelumnya
+                    </p>
+                    <div className="mt-4 flex items-end justify-between gap-3 border-t border-line pt-4">
+                      <div>
+                        <p className="text-[11px] font-semibold tracking-[0.04em] text-ink/60">
+                          Harga Mulai Dari
+                        </p>
+                        <p className="mt-0.5 text-[19px] font-semibold">
+                          {rupiahBulat(Number(s.price))}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => hapus(s.service_id)}
+                        aria-label={`Nonaktifkan ${s.service_name}`}
+                        title="Nonaktifkan layanan (booking lama tetap aman)"
+                        className="text-ink/50 hover:text-maroon"
+                      >
+                        <EyeIcon />
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
+
+            {memuat && <p className="text-[14px] text-muted">Memuat layanan...</p>}
+            {!memuat && services.length === 0 && (
+              <p className="text-[14px] text-muted">
+                Belum ada layanan. Tambahkan lewat tombol di kanan atas.
+              </p>
+            )}
           </div>
         </section>
       </div>
@@ -261,11 +305,12 @@ function AddServiceDialog({
 }: {
   ref: React.RefObject<HTMLDialogElement | null>
   defaultNotice: number
-  onAdd: (service: Service) => void
+  onAdd: (service: BaruLayanan) => Promise<void>
 }) {
   const [error, setError] = useState('')
+  const [mengirim, setMengirim] = useState(false)
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = e.currentTarget
     const data = new FormData(form)
@@ -283,18 +328,24 @@ function AddServiceDialog({
       return setError('Waktu persiapan harus berupa jumlah hari yang bulat.')
     }
 
-    onAdd({
-      id: `${category}-${Date.now()}`,
-      name,
-      category,
-      description: String(data.get('description') || '').trim(),
-      price,
-      noticeDays,
-    })
-
-    setError('')
-    form.reset()
-    ref.current?.close()
+    setMengirim(true)
+    try {
+      await onAdd({
+        service_name: name,
+        category,
+        description: String(data.get('description') || '').trim(),
+        price,
+        minimum_notice_days: noticeDays,
+      })
+      setError('')
+      form.reset()
+      ref.current?.close()
+    } catch (err) {
+      // Dialog sengaja tidak ditutup kalau gagal — isinya masih dibutuhkan.
+      setError((err as Error).message)
+    } finally {
+      setMengirim(false)
+    }
   }
 
   return (

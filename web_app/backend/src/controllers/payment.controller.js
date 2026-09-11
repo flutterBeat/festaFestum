@@ -53,19 +53,68 @@ async function applySuccess(client, paymentId, gatewayTxnId) {
   return { changed: true, booking_id, payment_type };
 }
 
-// POST /api/v1/payments/charge  (login)
-// Body: { booking_id, payment_type: 'down_payment'|'settlement', bank }
-async function charge(req, res, next) {
-  const { booking_id, payment_type, bank } = req.body;
+// Menerapkan satu status hasil terjemahan dari Midtrans ke sebuah payment.
+// Dipakai bersama oleh webhook (Midtrans yang memberi tahu kita) dan refresh
+// (kita yang bertanya ke Midtrans) — dua jalur itu harus identik hasilnya,
+// jadi logikanya sengaja cuma ada di satu tempat.
+async function applyGatewayStatus(client, paymentId, status, gatewayTxnId) {
+  const pay = await client.query(
+    `SELECT payment_id, gateway_status FROM payments WHERE payment_id = $1 FOR UPDATE`,
+    [paymentId]
+  );
 
-  if (!booking_id || !payment_type || !bank) {
-    return res.status(400).json({ message: 'booking_id, payment_type, dan bank wajib diisi' });
+  if (pay.rows.length === 0) return { found: false };
+
+  if (status === 'success') {
+    await applySuccess(client, paymentId, gatewayTxnId);
+  } else if (pay.rows[0].gateway_status !== 'success') {
+    // Jangan pernah menurunkan status yang sudah sukses.
+    await client.query(
+      `UPDATE payments
+          SET gateway_status = $2,
+              gateway_transaction_id = COALESCE(gateway_transaction_id, $3)
+        WHERE payment_id = $1`,
+      [paymentId, status, gatewayTxnId || null]
+    );
+  }
+
+  return { found: true };
+}
+
+// Isi palsu untuk mode simulasi, bentuknya sama persis dengan yang dikirim
+// Midtrans supaya halaman pembayaran di frontend tidak perlu tahu bedanya.
+function simulatedDetails(method) {
+  const angka = Date.now().toString().slice(-11);
+
+  if (method.endsWith('_va')) {
+    return { bank: method.replace('_va', ''), va_number: `8${angka}` };
+  }
+  if (method === 'mandiri_bill') {
+    return { bill_key: angka.slice(-7), biller_code: '70012' };
+  }
+  if (method === 'qris' || method === 'gopay') {
+    // QR kosong yang tetap merender sebagai gambar, jadi tata letaknya teruji.
+    return { qr_url: 'https://api.sandbox.midtrans.com/v2/qris/simulasi.png' };
+  }
+  if (method === 'indomaret' || method === 'alfamart') {
+    return { payment_code: angka.slice(-8), store: method };
+  }
+  return { redirect_url: 'https://simulator.sandbox.midtrans.com/' };
+}
+
+// POST /api/v1/payments/charge  (login)
+// Body: { booking_id, payment_type: 'down_payment'|'settlement', method }
+async function charge(req, res, next) {
+  const { booking_id, payment_type, method } = req.body;
+
+  if (!booking_id || !payment_type || !method) {
+    return res.status(400).json({ message: 'booking_id, payment_type, dan method wajib diisi' });
   }
   if (!VALID_TYPES.includes(payment_type)) {
     return res.status(400).json({ message: 'payment_type tidak valid', allowed: VALID_TYPES });
   }
-  if (!midtrans.SUPPORTED_BANKS.includes(bank)) {
-    return res.status(400).json({ message: 'bank tidak didukung', allowed: midtrans.SUPPORTED_BANKS });
+  if (!midtrans.METHOD_IDS.includes(method)) {
+    return res.status(400).json({ message: 'metode tidak didukung', allowed: midtrans.METHOD_IDS });
   }
 
   const client = await pool.connect();
@@ -133,39 +182,34 @@ async function charge(req, res, next) {
     // Midtrans. Satu percobaan bayar = satu baris = satu order_id unik, jadi
     // user yang mengulang setelah VA kedaluwarsa tidak ditolak "duplicate order".
     const ins = await client.query(
-      `INSERT INTO payments (booking_id, payment_type, amount, expires_at, bank)
+      `INSERT INTO payments (booking_id, payment_type, amount, expires_at, method)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [booking_id, payment_type, amount, expiresAt, bank]
+      [booking_id, payment_type, amount, expiresAt, method]
     );
 
     const payment = ins.rows[0];
+    const spec = midtrans.METHODS[method];
 
-    let vaNumber = null;
+    let details;
     let gatewayTxnId = null;
 
     if (midtrans.enabled) {
       const charged = await midtrans.core.charge({
-        payment_type: 'bank_transfer',
+        ...spec.build(amount),
         transaction_details: { order_id: payment.payment_id, gross_amount: amount },
-        bank_transfer: { bank },
         custom_expiry: { unit: 'hour', expiry_duration: VA_EXPIRY_HOURS },
       });
-      // Permata menaruh nomornya di field sendiri, bank lain di array va_numbers.
-      vaNumber = charged.permata_va_number
-        || (charged.va_numbers && charged.va_numbers[0] && charged.va_numbers[0].va_number)
-        || null;
+      details = spec.extract(charged);
       gatewayTxnId = charged.transaction_id || null;
     } else {
-      // Mode simulasi: nomor VA palsu yang bentuknya mirip aslinya supaya
-      // halaman VA di frontend tetap bisa diuji tampilannya.
-      vaNumber = `8${Date.now().toString().slice(-11)}`;
+      details = simulatedDetails(method);
     }
 
     const done = await client.query(
-      `UPDATE payments SET va_number = $2, gateway_transaction_id = $3
+      `UPDATE payments SET details = $2, gateway_transaction_id = $3
         WHERE payment_id = $1 RETURNING *`,
-      [payment.payment_id, vaNumber, gatewayTxnId]
+      [payment.payment_id, JSON.stringify(details), gatewayTxnId]
     );
 
     await client.query('COMMIT');
@@ -203,33 +247,15 @@ async function webhook(req, res, next) {
   try {
     await client.query('BEGIN');
 
-    const pay = await client.query(
-      `SELECT payment_id, gateway_status FROM payments WHERE payment_id = $1 FOR UPDATE`,
-      [body.order_id]
+    const { found } = await applyGatewayStatus(
+      client, body.order_id, status, body.transaction_id
     );
 
-    if (pay.rows.length === 0) {
-      await client.query('ROLLBACK');
-      // 200, bukan 404: kalau kita balas error, Midtrans akan retry terus untuk
-      // order_id yang memang tidak pernah ada di sini.
-      return res.json({ message: 'Diabaikan, payment tidak dikenal' });
-    }
-
-    if (status === 'success') {
-      await applySuccess(client, body.order_id, body.transaction_id);
-    } else if (pay.rows[0].gateway_status !== 'success') {
-      // Jangan pernah menurunkan status yang sudah sukses.
-      await client.query(
-        `UPDATE payments
-            SET gateway_status = $2,
-                gateway_transaction_id = COALESCE(gateway_transaction_id, $3)
-          WHERE payment_id = $1`,
-        [body.order_id, status, body.transaction_id || null]
-      );
-    }
-
     await client.query('COMMIT');
-    res.json({ message: 'OK' });
+
+    // 200 walau tidak ditemukan: kalau kita balas error, Midtrans akan retry
+    // terus untuk order_id yang memang tidak pernah ada di sini.
+    res.json({ message: found ? 'OK' : 'Diabaikan, payment tidak dikenal' });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     next(err);
@@ -253,6 +279,101 @@ async function listByBooking(req, res, next) {
     res.json({ payments: rows });
   } catch (err) {
     next(err);
+  }
+}
+
+// GET /api/v1/payments/:paymentId  (login)
+// Satu tagihan beserta pesanannya, untuk halaman pembayaran. Kepemilikan ikut
+// di WHERE lewat join ke bookings — 404 kalau bukan milik user ini.
+async function getPayment(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT p.*, b.booking_id, b.total_price, b.dp_amount, b.payment_status,
+              b.event_location_detail,
+              s.service_name, s.category,
+              v.business_name, v.city,
+              sch.event_date, sch.time_slot
+         FROM payments p
+         JOIN bookings b ON b.booking_id = p.booking_id
+         JOIN services s ON s.service_id = b.service_id
+         JOIN vendors  v ON v.vendor_id  = s.vendor_id
+         JOIN vendor_schedules sch ON sch.schedule_id = b.schedule_id
+        WHERE p.payment_id = $1 AND b.user_id = $2`,
+      [req.params.paymentId, req.user.user_id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Pembayaran tidak ditemukan' });
+    }
+    res.json({ payment: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/v1/payments/:paymentId/refresh  (login)
+//
+// Kita yang bertanya ke Midtrans "pembayaran ini sudah masuk belum?", kebalikan
+// dari webhook yang menunggu Midtrans memberi tahu. Gunanya: webhook butuh
+// backend yang bisa dihubungi dari internet, sedangkan ini cuma butuh koneksi
+// keluar biasa. Jadi alur pembayaran tetap maju walau backend masih di laptop.
+//
+// Webhook tetap jalur utama (lebih cepat, tidak boros request). Ini jaring
+// pengaman, dan keduanya lewat applyGatewayStatus supaya hasilnya tidak
+// mungkin berbeda.
+async function refresh(req, res, next) {
+  if (!midtrans.enabled) {
+    return res.status(409).json({
+      message: 'Midtrans tidak aktif — pakai POST /payments/:id/simulate',
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    // Kepemilikan dicek dulu, sebelum menghubungi Midtrans: jangan sampai
+    // endpoint ini bisa dipakai menebak payment_id milik orang lain.
+    const own = await client.query(
+      `SELECT p.payment_id
+         FROM payments p
+         JOIN bookings b ON b.booking_id = p.booking_id
+        WHERE p.payment_id = $1 AND b.user_id = $2`,
+      [req.params.paymentId, req.user.user_id]
+    );
+
+    if (own.rows.length === 0) {
+      return res.status(404).json({ message: 'Pembayaran tidak ditemukan' });
+    }
+
+    let trx;
+    try {
+      trx = await midtrans.core.transaction.status(req.params.paymentId);
+    } catch (err) {
+      // 404 dari Midtrans = transaksi belum pernah terbentuk di sana.
+      // Bukan error kita, dan bukan alasan menggagalkan polling frontend.
+      if (err.httpStatusCode === '404' || err.httpStatusCode === 404) {
+        return res.json({ status: 'pending', message: 'Belum tercatat di gateway' });
+      }
+      console.error('[midtrans] cek status gagal:', err.message);
+      return res.status(502).json({ message: 'Gateway pembayaran sedang tidak bisa dihubungi' });
+    }
+
+    const status = midtrans.mapStatus(trx.transaction_status, trx.fraud_status);
+
+    await client.query('BEGIN');
+    await applyGatewayStatus(client, req.params.paymentId, status, trx.transaction_id);
+    await client.query('COMMIT');
+
+    const fresh = await client.query(
+      'SELECT * FROM payments WHERE payment_id = $1',
+      [req.params.paymentId]
+    );
+
+    res.json({ payment: fresh.rows[0], gateway_status: trx.transaction_status });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    next(err);
+  } finally {
+    client.release();
   }
 }
 
@@ -297,4 +418,4 @@ async function simulate(req, res, next) {
   }
 }
 
-module.exports = { charge, webhook, listByBooking, simulate };
+module.exports = { charge, webhook, listByBooking, getPayment, refresh, simulate };

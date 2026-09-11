@@ -154,4 +154,191 @@ async function expireStaleBookings() {
   }
 }
 
-module.exports = { createBooking, expireStaleBookings };
+// Satu booking apa adanya, lengkap dengan layanan, vendor, jadwal, dan
+// riwayat pembayarannya. Dipakai bertiga oleh Pesanan Saya (sisi customer),
+// Pemesanan (sisi vendor), dan Dashboard vendor — supaya bentuk datanya sama
+// dan frontend tidak perlu menyusun ulang per halaman.
+const BOOKING_SELECT = `
+  SELECT b.booking_id, b.event_type, b.event_location_detail,
+         b.total_price, b.dp_amount, b.payment_status,
+         b.soft_lock_expires_at, b.created_at,
+         s.service_id, s.service_name, s.category,
+         v.vendor_id, v.business_name, v.city,
+         u.name AS customer_name, u.phone AS customer_phone,
+         sch.event_date, sch.time_slot,
+         COALESCE(
+           (SELECT json_agg(json_build_object(
+                     'payment_id', p.payment_id,
+                     'payment_type', p.payment_type,
+                     'amount', p.amount,
+                     'method', p.method,
+                     'details', p.details,
+                     'gateway_status', p.gateway_status,
+                     'expires_at', p.expires_at,
+                     'paid_at', p.paid_at
+                   ) ORDER BY p.created_at)
+              FROM payments p WHERE p.booking_id = b.booking_id),
+           '[]'::json
+         ) AS payments
+    FROM bookings b
+    JOIN services s         ON s.service_id  = b.service_id
+    JOIN vendors  v         ON v.vendor_id   = s.vendor_id
+    JOIN users    u         ON u.user_id     = b.user_id
+    JOIN vendor_schedules sch ON sch.schedule_id = b.schedule_id`;
+
+// GET /api/v1/bookings  (login) — pesanan milik customer yang sedang login.
+async function listMyBookings(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `${BOOKING_SELECT}
+        WHERE b.user_id = $1
+        ORDER BY b.created_at DESC`,
+      [req.user.user_id]
+    );
+    res.json({ data: rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/bookings/:bookingId  (login)
+// Kepemilikan ikut di WHERE: customer pemiliknya ATAU vendor yang dipesan.
+// Selain itu 404, bukan 403, supaya ID valid tidak bocor.
+async function getBooking(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `${BOOKING_SELECT}
+        WHERE b.booking_id = $1
+          AND (b.user_id = $2 OR v.owner_user_id = $2)`,
+      [req.params.bookingId, req.user.user_id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Pesanan tidak ditemukan' });
+    }
+    res.json({ booking: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/bookings/vendor  (role: vendor_owner) — pesanan yang MASUK.
+async function listVendorBookings(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `${BOOKING_SELECT}
+        WHERE v.owner_user_id = $1
+        ORDER BY sch.event_date ASC`,
+      [req.user.user_id]
+    );
+    res.json({ data: rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/bookings/vendor/stats  (role: vendor_owner)
+// Angka-angka untuk kartu di Dashboard vendor. Sengaja satu query: lima
+// SELECT terpisah berarti lima round-trip ke Supabase untuk satu halaman.
+async function vendorStats(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `WITH v AS (SELECT vendor_id FROM vendors WHERE owner_user_id = $1),
+       b AS (
+         SELECT bk.booking_id, bk.payment_status, sch.event_date
+           FROM bookings bk
+           JOIN services s ON s.service_id = bk.service_id
+           JOIN vendor_schedules sch ON sch.schedule_id = bk.schedule_id
+          WHERE s.vendor_id IN (SELECT vendor_id FROM v)
+       )
+       SELECT
+         -- Pendapatan = pembayaran yang BENAR-BENAR lunas bulan ini.
+         COALESCE((
+           SELECT SUM(p.amount) FROM payments p
+            WHERE p.booking_id IN (SELECT booking_id FROM b)
+              AND p.gateway_status = 'success'
+              AND date_trunc('month', p.paid_at) = date_trunc('month', now())
+         ), 0) AS revenue_bulan_ini,
+         COALESCE((
+           SELECT SUM(p.amount) FROM payments p
+            WHERE p.booking_id IN (SELECT booking_id FROM b)
+              AND p.gateway_status = 'success'
+              AND date_trunc('month', p.paid_at)
+                  = date_trunc('month', now() - interval '1 month')
+         ), 0) AS revenue_bulan_lalu,
+         (SELECT count(*) FROM b)::int AS total_pesanan,
+         (SELECT count(*) FROM b WHERE payment_status = 'pending')::int AS menunggu_dp,
+         (SELECT count(*) FROM b WHERE payment_status = 'fully_paid')::int AS lunas,
+         (SELECT count(*) FROM b
+           WHERE event_date BETWEEN now() - interval '7 days' AND now())::int AS selesai_minggu_ini,
+         (SELECT count(*) FROM vendor_schedules
+           WHERE vendor_id IN (SELECT vendor_id FROM v)
+             AND status = 'available' AND event_date >= CURRENT_DATE)::int AS slot_tersedia`,
+      [req.user.user_id]
+    );
+    res.json({ stats: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/bookings/vendor/balance  (role: vendor_owner)
+// Saldo vendor DITURUNKAN dari tabel payments, bukan disimpan sebagai kolom —
+// kolom saldo gampang melenceng dari kenyataan kalau ada satu update terlewat.
+//
+// Aturannya: pembayaran yang sukses masih di ESCROW selama acaranya belum
+// lewat; setelah tanggal acara terlampaui, dana masuk SALDO TERSEDIA dikurangi
+// biaya platform. Penarikan dana belum ada (tabel payouts belum dibuat,
+// menunggu keputusan alur approval admin).
+const PLATFORM_FEE_RATE = 0.025;
+
+async function vendorBalance(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `WITH lunas AS (
+         SELECT p.amount, sch.event_date
+           FROM payments p
+           JOIN bookings bk ON bk.booking_id = p.booking_id
+           JOIN services s  ON s.service_id  = bk.service_id
+           JOIN vendors  v  ON v.vendor_id   = s.vendor_id
+           JOIN vendor_schedules sch ON sch.schedule_id = bk.schedule_id
+          WHERE v.owner_user_id = $1 AND p.gateway_status = 'success'
+       )
+       SELECT
+         COALESCE(SUM(amount) FILTER (WHERE event_date <  CURRENT_DATE), 0) AS dirilis_kotor,
+         COALESCE(SUM(amount) FILTER (WHERE event_date >= CURRENT_DATE), 0) AS escrow,
+         COALESCE(SUM(amount), 0) AS total_masuk,
+         count(*) FILTER (WHERE event_date >= CURRENT_DATE)::int AS pesanan_escrow
+       FROM lunas`,
+      [req.user.user_id]
+    );
+
+    const r = rows[0];
+    const kotor = Number(r.dirilis_kotor);
+    const fee = Math.round(kotor * PLATFORM_FEE_RATE);
+
+    res.json({
+      balance: {
+        saldo_tersedia: kotor - fee,
+        escrow: Number(r.escrow),
+        total_masuk: Number(r.total_masuk),
+        biaya_platform: fee,
+        platform_fee_rate: PLATFORM_FEE_RATE,
+        pesanan_escrow: r.pesanan_escrow,
+        // Penarikan belum tersedia — lihat catatan di atas.
+        penarikan_aktif: false,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  createBooking,
+  expireStaleBookings,
+  listMyBookings,
+  getBooking,
+  listVendorBookings,
+  vendorStats,
+  vendorBalance,
+};

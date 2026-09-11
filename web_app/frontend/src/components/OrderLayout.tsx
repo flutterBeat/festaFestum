@@ -2,14 +2,37 @@ import { Link } from 'react-router-dom'
 import Img from './Img'
 import FlowLayout from './FlowLayout'
 import { ArrowRight } from './icons'
-import { deposit, DEPOSIT_RATE, type OrderSummary } from '../data/mockOrders'
 import { rupiah } from '../lib/format'
 
-/** Halaman "Lengkapi Detail Pesanan": form di kiri, ringkasan pesanan
- *  menempel di kanan. Isi formnya beda tiap kategori. */
-export default function OrderLayout({ order, children }: { order: OrderSummary; children: React.ReactNode }) {
-  const dp = deposit(order.price)
+/** Ringkasan pesanan di panel kanan. Datanya dari GET /vendors/:id +
+ *  /vendors/:id/services, bukan lagi dari data contoh. */
+export type OrderSummary = {
+  vendor: string
+  packageName: string
+  price: number
+  /** DP dihitung BACKEND. Halaman ini cuma menampilkan, tidak menghitung —
+   *  kalau dua-duanya menghitung, angkanya bisa berbeda dan user ditagih
+   *  jumlah yang tidak dia lihat. */
+  dp: number
+  emoji: string
+  tint: string
+  backTo: string
+}
 
+/** Halaman "Lengkapi Detail Pesanan": form di kiri, ringkasan pesanan
+ *  menempel di kanan. Isi formnya beda tiap kategori.
+ *
+ *  Tombolnya submit, bukan Link: booking dibuat dulu di backend supaya
+ *  slotnya terkunci, baru pindah ke checkout membawa booking_id asli. */
+export default function OrderLayout({
+  order, children, onSubmit, mengirim = false, galat = '',
+}: {
+  order: OrderSummary
+  children: React.ReactNode
+  onSubmit: () => void
+  mengirim?: boolean
+  galat?: string
+}) {
   return (
     <FlowLayout title="Lengkapi Detail Pesanan">
       <div className="mt-7 grid gap-8 lg:grid-cols-[1fr_400px]">
@@ -26,7 +49,12 @@ export default function OrderLayout({ order, children }: { order: OrderSummary; 
 
         {/* RINGKASAN PESANAN */}
         <aside className="h-fit border border-line bg-white lg:sticky lg:top-8">
-          <Img src={order.image} alt={order.imageAlt} className="h-[150px] w-full object-cover" />
+          <Img
+            alt={order.vendor}
+            emoji={order.emoji}
+            tint={order.tint}
+            className="h-[150px] w-full object-cover"
+          />
 
           <div className="border-t border-line p-6">
             <h2 className="font-display text-[26px] font-semibold">{order.vendor}</h2>
@@ -34,20 +62,29 @@ export default function OrderLayout({ order, children }: { order: OrderSummary; 
 
             <dl className="mt-7 space-y-3 text-[15px]">
               <Row label="Harga Paket" value={rupiah(order.price)} />
-              <Row label={`Deposit (${DEPOSIT_RATE * 100}%)`} value={rupiah(dp)} />
+              <Row label="DP yang dibayar sekarang" value={rupiah(order.dp)} />
+              <Row label="Sisa saat pelunasan" value={rupiah(order.price - order.dp)} />
             </dl>
 
             <dl className="mt-7">
-              <Row label="Total:" value={rupiah(order.price + dp)} bold />
+              <Row label="Total:" value={rupiah(order.price)} bold />
             </dl>
 
-            <Link
-              to="/checkout"
-              className="mt-4 flex h-12 w-full items-center justify-center gap-4 rounded-sm bg-amber text-[16px] font-medium text-navy-900 transition-opacity hover:opacity-90"
+            {galat && (
+              <p className="mt-4 border border-maroon/30 bg-maroon/5 px-3 py-2 text-[13px] text-maroon">
+                {galat}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={mengirim}
+              className="mt-4 flex h-12 w-full items-center justify-center gap-4 rounded-sm bg-amber text-[16px] font-medium text-navy-900 transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              Ajukan Pesanan
+              {mengirim ? 'Mengunci slot…' : 'Ajukan Pesanan'}
               <ArrowRight className="h-5 w-5" />
-            </Link>
+            </button>
           </div>
         </aside>
       </div>
@@ -94,18 +131,29 @@ export function OrderField({
   label,
   type = 'text',
   placeholder,
+  value,
+  onChange,
 }: {
   id: string
   label: string
   type?: string
   placeholder?: string
+  value?: string
+  onChange?: (v: string) => void
 }) {
   return (
     <div>
       <label htmlFor={id} className="block text-[11px] font-semibold tracking-[0.06em] text-ink/70">
         {label}
       </label>
-      <input id={id} type={type} placeholder={placeholder} className={fieldClass} />
+      <input
+        id={id}
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+        className={fieldClass}
+      />
     </div>
   )
 }
@@ -115,11 +163,15 @@ export function OrderTextarea({
   label,
   placeholder,
   rows = 5,
+  value,
+  onChange,
 }: {
   id: string
   label?: string
   placeholder?: string
   rows?: number
+  value?: string
+  onChange?: (v: string) => void
 }) {
   return (
     <div>
@@ -132,7 +184,9 @@ export function OrderTextarea({
         id={id}
         rows={rows}
         placeholder={placeholder}
-        className="mt-2 w-full rounded-sm border border-line bg-white px-3 py-2.5 text-[14px] outline-none placeholder:text-ink/35 focus:border-navy-900"
+        value={value}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+        className="mt-2 w-full rounded-sm border border-line bg-white p-3 text-[14px] outline-none focus:border-navy-900"
       />
     </div>
   )

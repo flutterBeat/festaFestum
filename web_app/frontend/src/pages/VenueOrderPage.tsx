@@ -1,6 +1,13 @@
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import OrderLayout, { OrderField, OrderSection, OrderTextarea } from '../components/OrderLayout'
 import { CalendarIcon, MapPinIcon, NoteIcon } from '../components/icons'
-import { orders } from '../data/mockOrders'
+import { shifts } from '../data/shifts'
+import { categories, type CategoryKey } from '../data/categories'
+import {
+  getVendor, getVendorServices, buatBooking,
+  type ApiService, type ApiVendor,
+} from '../lib/api'
 
 /** Halaman "Lengkapi Detail Pesanan" untuk tiga kategori yang bentuk formnya
  *  identik: MUA, Event Organizer, dan Fotografer. Ketiganya sama-sama minta
@@ -14,7 +21,7 @@ import { orders } from '../data/mockOrders'
  */
 
 type Variant = {
-  order: keyof typeof orders
+  kategori: CategoryKey
   /** Satu angka perkiraan yang ditanyakan di bawah tanggal & jam. */
   estimate: { id: string; label: string; type?: string; placeholder: string }
   venueLabel: string
@@ -23,7 +30,7 @@ type Variant = {
 
 const variants = {
   mua: {
-    order: 'mua',
+    kategori: 'mua',
     estimate: {
       id: 'jumlah-orang',
       label: 'JUMLAH ORANG YANG AKAN DIRIAS',
@@ -34,7 +41,7 @@ const variants = {
     note: { label: 'PREFERENSI MAKEUP & REQUEST KHUSUS' },
   },
   eo: {
-    order: 'eo',
+    kategori: 'eo',
     estimate: {
       id: 'jumlah-tamu',
       label: 'ESTIMASI JUMLAH TAMU',
@@ -46,7 +53,7 @@ const variants = {
     note: { placeholder: 'Ceritakan kebutuhan acara Anda...' },
   },
   fotografer: {
-    order: 'fotografer',
+    kategori: 'fotografer',
     estimate: {
       id: 'durasi',
       label: 'ESTIMASI DURASI ACARA',
@@ -57,30 +64,183 @@ const variants = {
   },
 } satisfies Record<string, Variant>
 
+/** Mengikuti enum event_type di DB. Wajib dipilih: POST /bookings menolak
+ *  tanpa ini, dan nilainya harus persis salah satu dari lima ini. */
+const JENIS_ACARA = [
+  { value: 'wedding', label: 'Pernikahan' },
+  { value: 'engagement', label: 'Lamaran' },
+  { value: 'graduation', label: 'Wisuda' },
+  { value: 'gala_dinner', label: 'Gala Dinner' },
+  { value: 'corporate_seminar', label: 'Seminar / Korporat' },
+]
+
 export default function VenueOrderPage({ kind }: { kind: keyof typeof variants }) {
   const v = variants[kind]
+  const kat = categories[v.kategori]
+  const { id = '' } = useParams()
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+
+  const [vendor, setVendor] = useState<ApiVendor | null>(null)
+  const [layanan, setLayanan] = useState<ApiService[]>([])
+  const [memuat, setMemuat] = useState(true)
+  const [galat, setGalat] = useState('')
+  const [mengirim, setMengirim] = useState(false)
+
+  // Dibawa dari halaman detail lewat query. EO tidak punya kalender di
+  // halaman detailnya, jadi tanggal & shift diisi di sini.
+  const [serviceId, setServiceId] = useState(params.get('service') ?? '')
+  const [tanggal, setTanggal] = useState(params.get('date') ?? '')
+  const [shift, setShift] = useState(params.get('slot') ?? shifts[0].value)
+
+  const [jenisAcara, setJenisAcara] = useState(JENIS_ACARA[0].value)
+  const [estimasi, setEstimasi] = useState('')
+  const [venue, setVenue] = useState('')
+  const [alamat, setAlamat] = useState('')
+  const [catatan, setCatatan] = useState('')
+
+  useEffect(() => {
+    Promise.all([getVendor(id), getVendorServices(id)])
+      .then(([r, s]) => {
+        const aktif = s.data.filter((x) => x.is_active)
+        setVendor(r.vendor)
+        setLayanan(aktif)
+        if (!params.get('service') && aktif[0]) setServiceId(aktif[0].service_id)
+      })
+      .catch((e) => setGalat(e.message))
+      .finally(() => setMemuat(false))
+  }, [id, params])
+
+  const paket = layanan.find((s) => s.service_id === serviceId) ?? layanan[0]
+  const harga = paket ? Number(paket.price) : 0
+
+  async function ajukan() {
+    setGalat('')
+
+    if (!paket) return setGalat('Vendor ini belum punya layanan aktif.')
+    if (!tanggal) return setGalat('Tanggal acara wajib diisi.')
+    if (!venue.trim() || !alamat.trim()) return setGalat('Venue dan alamat lengkap wajib diisi.')
+
+    // Catatan & estimasi digabung ke event_location_detail: tabel bookings
+    // belum punya kolom terpisah untuknya, dan menambah kolom demi satu
+    // halaman bukan tukar-tambah yang sepadan menjelang tenggat.
+    const detail = [
+      `${venue.trim()} — ${alamat.trim()}`,
+      estimasi && `${v.estimate.label}: ${estimasi}`,
+      catatan.trim() && `Catatan: ${catatan.trim()}`,
+    ].filter(Boolean).join('\n')
+
+    setMengirim(true)
+    try {
+      const r = await buatBooking({
+        service_id: paket.service_id,
+        event_date: tanggal,
+        time_slot: shift,
+        event_type: jenisAcara,
+        event_location_detail: detail,
+      })
+      navigate(`/checkout/${r.booking.booking_id}`)
+    } catch (e) {
+      setGalat((e as Error).message)
+    } finally {
+      setMengirim(false)
+    }
+  }
+
+  if (memuat) {
+    return <p className="mx-auto max-w-[1330px] px-6 py-20 text-[14px] text-muted">Memuat…</p>
+  }
+  if (!vendor) {
+    return <p className="mx-auto max-w-[1330px] px-6 py-20 text-[15px]">{galat || 'Vendor tidak ditemukan.'}</p>
+  }
 
   return (
-    <OrderLayout order={orders[v.order]}>
+    <OrderLayout
+      order={{
+        vendor: vendor.business_name,
+        packageName: paket?.service_name ?? 'Belum ada paket',
+        price: harga,
+        // DP 30% mengikuti backend. Angka yang MENGIKAT tetap dp_amount yang
+        // dikembalikan POST /bookings dan ditampilkan di halaman checkout.
+        dp: Math.round(harga * 0.3),
+        emoji: kat.emoji,
+        tint: kat.tint,
+        backTo: `/${kat.slug}/${id}`,
+      }}
+      onSubmit={ajukan}
+      mengirim={mengirim}
+      galat={galat}
+    >
       <OrderSection title="Informasi Acara" icon={<CalendarIcon />}>
+        {layanan.length > 1 && (
+          <div className="mb-5">
+            <label htmlFor="paket" className="block text-[11px] font-semibold tracking-[0.06em] text-ink/70">
+              PAKET YANG DIPESAN
+            </label>
+            <select
+              id="paket"
+              value={serviceId}
+              onChange={(e) => setServiceId(e.target.value)}
+              className="mt-2 h-11 w-full rounded-sm border border-line bg-white px-3 text-[14px] outline-none focus:border-navy-900"
+            >
+              {layanan.map((s) => (
+                <option key={s.service_id} value={s.service_id}>{s.service_name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="grid gap-5 sm:grid-cols-2">
-          <OrderField id="tanggal" label="TANGGAL ACARA" type="date" />
-          <OrderField id="waktu" label="WAKTU MULAI" type="time" />
+          <OrderField
+            id="tanggal" label="TANGGAL ACARA" type="date"
+            value={tanggal} onChange={setTanggal}
+          />
+          <div>
+            <label htmlFor="shift" className="block text-[11px] font-semibold tracking-[0.06em] text-ink/70">
+              SHIFT
+            </label>
+            <select
+              id="shift"
+              value={shift}
+              onChange={(e) => setShift(e.target.value)}
+              className="mt-2 h-11 w-full rounded-sm border border-line bg-white px-3 text-[14px] outline-none focus:border-navy-900"
+            >
+              {shifts.map((s) => (
+                <option key={s.value} value={s.value}>{s.label} ({s.hours})</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="mt-5 sm:w-1/2 sm:pr-2.5">
-          <OrderField {...v.estimate} />
+
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <div>
+            <label htmlFor="jenis" className="block text-[11px] font-semibold tracking-[0.06em] text-ink/70">
+              JENIS ACARA
+            </label>
+            <select
+              id="jenis"
+              value={jenisAcara}
+              onChange={(e) => setJenisAcara(e.target.value)}
+              className="mt-2 h-11 w-full rounded-sm border border-line bg-white px-3 text-[14px] outline-none focus:border-navy-900"
+            >
+              {JENIS_ACARA.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+          <OrderField {...v.estimate} value={estimasi} onChange={setEstimasi} />
         </div>
       </OrderSection>
 
       <OrderSection title="Lokasi Acara" icon={<MapPinIcon className="h-4 w-4" />}>
         <div className="space-y-5">
-          <OrderField id="venue" label={v.venueLabel} />
-          <OrderTextarea id="alamat" label="ALAMAT LENGKAP" />
+          <OrderField id="venue" label={v.venueLabel} value={venue} onChange={setVenue} />
+          <OrderTextarea id="alamat" label="ALAMAT LENGKAP" value={alamat} onChange={setAlamat} />
         </div>
       </OrderSection>
 
       <OrderSection title="Catatan untuk Vendor" icon={<NoteIcon />}>
-        <OrderTextarea id="catatan" {...v.note} />
+        <OrderTextarea id="catatan" {...v.note} value={catatan} onChange={setCatatan} />
       </OrderSection>
     </OrderLayout>
   )

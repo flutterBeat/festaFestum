@@ -9,6 +9,14 @@ const VALID_CATEGORIES = [
   'event_organizer', 'florist', 'attire_rental', 'makeup_artist', 'photographer',
 ];
 
+const VALID_SLOTS = ['pagi', 'siang', 'malam'];
+
+function isValidDate(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
 // POST /api/v1/vendors  (role: vendor_owner)
 // Satu akun hanya boleh punya satu profil vendor.
 async function createVendor(req, res, next) {
@@ -52,7 +60,9 @@ async function createVendor(req, res, next) {
 // category difilter lewat services, karena satu vendor bisa lintas kategori.
 async function listVendors(req, res, next) {
   try {
-    const { city, category, min_rating } = req.query;
+    const {
+      city, category, min_rating, event_date, time_slot,
+    } = req.query;
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50);
     const offset = (page - 1) * limit;
@@ -68,16 +78,56 @@ async function listVendors(req, res, next) {
       conditions.push(`v.city = $${values.length}`);
     }
 
-    if (category) {
-      if (!VALID_CATEGORIES.includes(category)) {
-        return res.status(400).json({ message: 'category tidak valid', allowed: VALID_CATEGORIES });
+    if (category && !VALID_CATEGORIES.includes(category)) {
+      return res.status(400).json({ message: 'category tidak valid', allowed: VALID_CATEGORIES });
+    }
+
+    // Schedule-first discovery: tanggal + shift dipakai bersama, tidak sendiri.
+    // Sendirian keduanya tidak punya arti — "tersedia tanggal 20" tanpa shift
+    // tidak bisa dijawab, karena ketersediaan disimpan per shift.
+    if ((event_date && !time_slot) || (!event_date && time_slot)) {
+      return res.status(400).json({
+        message: 'event_date dan time_slot harus diisi berdua',
+      });
+    }
+    if (event_date && !isValidDate(event_date)) {
+      return res.status(400).json({ message: 'event_date harus format YYYY-MM-DD' });
+    }
+    if (time_slot && !VALID_SLOTS.includes(time_slot)) {
+      return res.status(400).json({ message: 'time_slot tidak valid', allowed: VALID_SLOTS });
+    }
+
+    // Kategori dan ketersediaan digabung dalam SATU EXISTS, bukan dua kondisi
+    // terpisah. Kalau dipisah, vendor bisa lolos filter "florist" gara-gara
+    // layanan fotografernya yang kosong di tanggal itu — padahal floristnya
+    // justru penuh. Yang harus tersedia adalah layanan DI KATEGORI ITU.
+    if (category || event_date) {
+      const syarat = ['s.vendor_id = v.vendor_id', 's.is_active = TRUE'];
+      let join = '';
+
+      if (category) {
+        values.push(category);
+        syarat.push(`s.category = $${values.length}`);
       }
-      values.push(category);
+
+      if (event_date) {
+        values.push(event_date);
+        const pDate = values.length;
+        values.push(time_slot);
+        const pSlot = values.length;
+
+        join = `JOIN vendor_schedules sch
+                  ON sch.vendor_id = s.vendor_id
+                 AND sch.event_date = $${pDate}::date
+                 AND sch.time_slot  = $${pSlot}::time_slot`;
+        syarat.push("sch.status = 'available'");
+        // Lead time per layanan, aturan yang sama dengan POST /schedules/check.
+        syarat.push(`$${pDate}::date >= CURRENT_DATE + s.minimum_notice_days`);
+      }
+
       conditions.push(`EXISTS (
-        SELECT 1 FROM services s
-        WHERE s.vendor_id = v.vendor_id
-          AND s.category = $${values.length}
-          AND s.is_active = TRUE
+        SELECT 1 FROM services s ${join}
+        WHERE ${syarat.join(' AND ')}
       )`);
     }
 

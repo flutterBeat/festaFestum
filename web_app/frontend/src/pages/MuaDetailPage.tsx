@@ -1,64 +1,113 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import Img from '../components/Img'
 import VendorLocation from '../components/VendorLocation'
 import BackButton from '../components/BackButton'
 import { ArrowRight, ChevronDown, PhotoIcon } from '../components/icons'
 import { shifts } from '../data/shifts'
+import { categories, namaKota } from '../data/categories'
 import { rupiah } from '../lib/format'
+import {
+  getVendor, getVendorServices, cekKetersediaan,
+  type ApiService, type ApiVendor,
+} from '../lib/api'
 
-// Data contoh sesuai mockup. Diganti hasil GET /api/v1/vendors/:id begitu
-// halaman ini disambungkan ke backend.
-const v = {
-  name: 'Aura Glow Artisty',
-  badge: 'MakeUp Artist',
-  headline: 'The Art Of Beauty',
-  about:
-    'Spesialis dalam riasan pengantin modern dan flawless yang menonjolkan kecantikan alami Anda. Dengan pengalaman lebih dari 8 tahun di industri pernikahan premium, tim Aura Glow didedikasikan untuk memastikan Anda tampil memukau dan merasa percaya diri di hari istimewa. Kami hanya menggunakan produk kosmetik high-end untuk ketahanan sepanjang hari.',
-  photos: [
-    { src: '/img/aura-1.jpg', alt: 'Riasan pengantin natural' },
-    { src: '/img/aura-2.jpg', alt: 'Peralatan makeup profesional' },
-  ],
-  packages: [
-    {
-      name: 'Graduation Glam',
-      priceFrom: 450000,
-      desc: 'Paket makeup dan styling khusus untuk wisuda agar tampil fresh, elegan, dan tetap percaya diri saat sesi acara maupun foto.',
-      bullets: [
-        'Makeup sesuai karakter dan kebutuhan wajah',
-        'Hair do atau hijab styling',
-        'Tampilan tahan lama untuk acara wisuda',
-      ],
-    },
-    { name: 'Graduation Basic', priceFrom: 400000, desc: '', bullets: [] },
-    { name: 'Graduation Premium', priceFrom: 475000, desc: '', bullets: [] },
-  ],
-}
+const kategori = categories.mua
+
+/** Headline hiasan; tidak ada kolomnya di database. */
+const HEADLINE = 'The Art Of Beauty'
 
 export default function MuaDetailPage() {
-  const [packageName, setPackageName] = useState(v.packages[1].name)
+  const { id = '' } = useParams()
+  const navigate = useNavigate()
 
-  // Total = harga paket yang dipilih. Fallback ke paket pertama supaya panel
-  // tidak pernah menampilkan total kosong.
-  const selected = v.packages.find((p) => p.name === packageName) ?? v.packages[0]
+  const [vendor, setVendor] = useState<ApiVendor | null>(null)
+  const [layanan, setLayanan] = useState<ApiService[]>([])
+  const [memuat, setMemuat] = useState(true)
+  const [galat, setGalat] = useState('')
+
+  // Paket yang dipilih = service_id, bukan namanya. Nama bisa kembar antar
+  // vendor, service_id tidak.
+  const [paketId, setPaketId] = useState('')
+  const [tanggal, setTanggal] = useState('')
+  const [shift, setShift] = useState(shifts[0].value as string)
+  const [cek, setCek] = useState<{ ada: boolean; alasan: string | null } | null>(null)
+  const [mengecek, setMengecek] = useState(false)
+
+  useEffect(() => {
+    Promise.all([getVendor(id), getVendorServices(id)])
+      .then(([v, s]) => {
+        const aktif = s.data.filter((x) => x.is_active)
+        setVendor(v.vendor)
+        setLayanan(aktif)
+        if (aktif[0]) setPaketId(aktif[0].service_id)
+      })
+      .catch((e) => setGalat(e.message))
+      .finally(() => setMemuat(false))
+  }, [id])
+
+  // Fallback ke paket pertama supaya panel tidak pernah menampilkan total kosong.
+  const dipilih = layanan.find((p) => p.service_id === paketId) ?? layanan[0]
+
+  async function ajukan() {
+    if (!dipilih) return
+    if (!tanggal) {
+      setCek({ ada: false, alasan: 'Pilih tanggal acara dulu.' })
+      return
+    }
+
+    setMengecek(true)
+    try {
+      const r = await cekKetersediaan({
+        service_id: dipilih.service_id, event_date: tanggal, time_slot: shift,
+      })
+      setCek({ ada: r.available, alasan: r.reason })
+      if (r.available) {
+        navigate(`/${kategori.slug}/${id}/pesan?service=${dipilih.service_id}`
+          + `&date=${tanggal}&slot=${shift}`)
+      }
+    } catch (e) {
+      setCek({ ada: false, alasan: (e as Error).message })
+    } finally {
+      setMengecek(false)
+    }
+  }
+
+  if (memuat) {
+    return <p className="mx-auto max-w-[1330px] px-6 py-20 text-[14px] text-muted">Memuat…</p>
+  }
+  if (galat || !vendor) {
+    return (
+      <div className="mx-auto max-w-[1330px] px-6 py-20">
+        <BackButton fallback={`/${kategori.slug}`} />
+        <p className="mt-6 text-[15px]">{galat || 'Vendor tidak ditemukan.'}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-[1330px] px-6 pt-12 pb-20 md:px-12">
-      <BackButton fallback="/mua" />
+      <BackButton fallback={`/${kategori.slug}`} />
 
-      <h1 className="mt-5 font-display text-[38px] font-semibold">{v.name}</h1>
+      <h1 className="mt-5 font-display text-[38px] font-semibold">{vendor.business_name}</h1>
       <span className="mt-3 inline-block rounded-full bg-pink-100 px-4 py-1.5 text-[13px] text-maroon">
-        {v.badge}
+        {vendor.is_verified ? 'Vendor Terverifikasi' : 'Makeup Artist'} · {namaKota(vendor.city)}
       </span>
 
-      {/* GALERI: dua foto, besar di kiri. */}
+      {/* GALERI: dua blok, besar di kiri. Foto vendor belum ada. */}
       <section className="relative mt-6 grid gap-2.5 md:grid-cols-3">
         <Img
-          src={v.photos[0].src}
-          alt={v.photos[0].alt}
+          alt={vendor.business_name}
+          emoji={kategori.emoji}
+          tint={kategori.tint}
           className="h-[300px] w-full object-cover md:col-span-2 md:h-[520px]"
         />
-        <Img src={v.photos[1].src} alt={v.photos[1].alt} className="h-[300px] w-full object-cover md:h-[520px]" />
+        <Img
+          alt={`${vendor.business_name} 2`}
+          emoji={kategori.emoji}
+          tint={kategori.tint}
+          className="h-[300px] w-full object-cover md:h-[520px]"
+        />
 
         <button
           type="button"
@@ -71,28 +120,35 @@ export default function MuaDetailPage() {
 
       <div className="mt-14 grid gap-12 lg:grid-cols-[1fr_420px]">
         <div>
-          <h2 className="font-display text-[26px] font-semibold">{v.headline}</h2>
-          <p className="mt-5 max-w-[560px] text-[15px] leading-[1.85] text-ink/85">{v.about}</p>
+          <h2 className="font-display text-[26px] font-semibold">{HEADLINE}</h2>
+          <p className="mt-5 max-w-[560px] text-[15px] leading-[1.85] text-ink/85">
+            {vendor.description || 'Vendor ini belum menuliskan deskripsi.'}
+          </p>
 
           <h2 className="mt-12 border-t border-line pt-12 font-display text-[26px] font-semibold">
             Paket Layanan
           </h2>
+
+          {layanan.length === 0 && (
+            <p className="mt-7 text-[14px] text-muted">Vendor ini belum menambahkan paket.</p>
+          )}
+
           <div className="mt-7 grid gap-6 sm:grid-cols-2">
-            {v.packages.map((p) => (
-              <article key={p.name} className="flex flex-col border border-line bg-white p-5">
-                <h3 className="font-display text-[22px] font-semibold">{p.name}</h3>
-                {p.desc && <p className="mt-3 text-[12px] leading-relaxed text-ink/75">{p.desc}</p>}
-                {p.bullets.length > 0 && (
-                  <ul className="mt-2 space-y-1 text-[12px] leading-relaxed text-ink/75">
-                    {p.bullets.map((b) => (
-                      <li key={b}>✓ {b}</li>
-                    ))}
-                  </ul>
+            {layanan.map((p) => (
+              <article key={p.service_id} className="flex flex-col border border-line bg-white p-5">
+                <h3 className="font-display text-[22px] font-semibold">{p.service_name}</h3>
+                {p.description && (
+                  <p className="mt-3 text-[12px] leading-relaxed text-ink/75">{p.description}</p>
                 )}
+                <p className="mt-2 text-[12px] text-ink/75">
+                  ✓ Pesan minimal {p.minimum_notice_days} hari sebelum acara
+                </p>
 
                 <div className="mt-auto border-t border-line pt-3">
                   <p className="mt-4 text-[11px] text-muted">Mulai dari</p>
-                  <p className="font-display text-[21px] font-semibold">{rupiah(p.priceFrom)}</p>
+                  <p className="font-display text-[21px] font-semibold">
+                    {rupiah(Number(p.price))}
+                  </p>
                 </div>
               </article>
             ))}
@@ -111,12 +167,12 @@ export default function MuaDetailPage() {
           <div className="relative mt-2">
             <select
               id="paket"
-              value={packageName}
-              onChange={(e) => setPackageName(e.target.value)}
+              value={paketId}
+              onChange={(e) => { setPaketId(e.target.value); setCek(null) }}
               className="h-11 w-full appearance-none rounded-sm border border-line bg-white px-3 pr-9 text-[14px] outline-none focus:border-navy-900"
             >
-              {v.packages.map((p) => (
-                <option key={p.name}>{p.name}</option>
+              {layanan.map((p) => (
+                <option key={p.service_id} value={p.service_id}>{p.service_name}</option>
               ))}
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/50" />
@@ -128,7 +184,8 @@ export default function MuaDetailPage() {
           <input
             id="event-date"
             type="date"
-            defaultValue="2026-01-15"
+            value={tanggal}
+            onChange={(e) => { setTanggal(e.target.value); setCek(null) }}
             className="mt-2 w-full border-b border-line bg-transparent pb-1.5 text-[15px] outline-none"
           />
 
@@ -139,7 +196,14 @@ export default function MuaDetailPage() {
                 key={s.value}
                 className="cursor-pointer border border-line py-2.5 text-center text-[13px] has-checked:border-navy-900 has-checked:bg-lavender/40"
               >
-                <input type="radio" name="shift" value={s.value} className="sr-only" />
+                <input
+                  type="radio"
+                  name="shift"
+                  value={s.value}
+                  checked={shift === s.value}
+                  onChange={() => { setShift(s.value); setCek(null) }}
+                  className="sr-only"
+                />
                 {s.label}
               </label>
             ))}
@@ -147,17 +211,26 @@ export default function MuaDetailPage() {
 
           <div className="mt-7 flex items-baseline justify-between border-t border-line pt-4">
             <span className="text-[15px] font-semibold">Total:</span>
-            <span className="font-display text-[22px] font-semibold">{rupiah(selected.priceFrom)}</span>
+            <span className="font-display text-[22px] font-semibold">
+              {dipilih ? rupiah(Number(dipilih.price)) : '-'}
+            </span>
           </div>
 
-          {/* Paket, tanggal & shift belum ikut terbawa — nanti lewat POST /schedules/hold. */}
-          <Link
-            to="pesan"
-            className="mt-4 flex h-11 w-full items-center justify-center gap-3 rounded-sm bg-amber text-[15px] font-semibold text-navy-900 transition-opacity hover:opacity-90"
+          {cek && !cek.ada && (
+            <p className="mt-4 border border-maroon/30 bg-maroon/5 px-3 py-2 text-[13px] text-maroon">
+              {cek.alasan || 'Slot tidak tersedia.'}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={ajukan}
+            disabled={mengecek || !dipilih}
+            className="mt-4 flex h-11 w-full items-center justify-center gap-3 rounded-sm bg-amber text-[15px] font-semibold text-navy-900 transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            Ajukan Pesanan
+            {mengecek ? 'Mengecek jadwal…' : 'Ajukan Pesanan'}
             <ArrowRight className="h-4 w-4" />
-          </Link>
+          </button>
         </aside>
       </div>
 
