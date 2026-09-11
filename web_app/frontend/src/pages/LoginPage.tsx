@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout, { inputClass } from '../components/AuthLayout'
 import { EyeIcon, EyeOffIcon, GoogleIcon } from '../components/icons'
-import { post, saveToken, type AuthResponse } from '../lib/api'
+import { post, saveAuth, type AuthResponse } from '../lib/api'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -17,11 +17,11 @@ export default function LoginPage() {
 
     const form = new FormData(e.currentTarget)
     try {
-      const { token } = await post<AuthResponse>('/auth/login', {
+      const auth = await post<AuthResponse>('/auth/login', {
         email: form.get('email'),
         password: form.get('password'),
       })
-      saveToken(token)
+      saveAuth(auth)
       navigate('/')
     } catch (err) {
       setError((err as Error).message)

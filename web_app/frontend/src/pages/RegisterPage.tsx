@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout, { inputClass } from '../components/AuthLayout'
 import { GoogleIcon } from '../components/icons'
-import { post, saveToken, type AuthResponse } from '../lib/api'
+import { post, saveAuth, type AuthResponse } from '../lib/api'
 
 const fields = [
   { name: 'name', label: 'Nama Lengkap', type: 'text', placeholder: 'John Doe', autoComplete: 'name' },
@@ -23,8 +23,8 @@ export default function RegisterPage() {
 
     const form = new FormData(e.currentTarget)
     try {
-      const { token } = await post<AuthResponse>('/auth/register', Object.fromEntries(form))
-      saveToken(token)
+      const auth = await post<AuthResponse>('/auth/register', Object.fromEntries(form))
+      saveAuth(auth)
       navigate('/')
     } catch (err) {
       setError((err as Error).message)

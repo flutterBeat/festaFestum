@@ -13,6 +13,15 @@ const JENIS: Record<string, string> = {
   corporate_seminar: 'Seminar / Korporat',
 }
 
+const tabs = ['Semua', 'Mendatang', 'Selesai', 'Dibatalkan'] as const
+
+/** Status sisi vendor sengaja lebih kasar daripada sisi customer: vendor
+ *  peduli "acaranya sudah lewat atau belum", bukan tahap pembayarannya —
+ *  nominal yang sudah masuk ditampilkan terpisah di kolom total. */
+function statusPesanan(b: ApiBooking): Exclude<(typeof tabs)[number], 'Semua'> {
+  if (b.payment_status === 'cancelled' || b.payment_status === 'expired') return 'Dibatalkan'
+  return new Date(b.event_date) < new Date(new Date().toDateString()) ? 'Selesai' : 'Mendatang'
+}
 
 const tone = { Mendatang: 'info', Selesai: 'muted', Dibatalkan: 'warn' } as const
 

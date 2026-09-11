@@ -5,7 +5,7 @@ import { SearchIcon, ChevronDown } from '../components/icons'
 import { categories, namaKota, type CategoryKey } from '../data/categories'
 import { shifts } from '../data/shifts'
 import { rupiah } from '../lib/format'
-import { listMyBookings, type ApiBooking } from '../lib/api'
+import { getToken, listMyBookings, type ApiBooking } from '../lib/api'
 
 const KATEGORI: Record<string, CategoryKey> = {
   florist: 'florist',
@@ -61,12 +61,18 @@ export default function PesananSayaPage() {
   const [query, setQuery] = useState('')
   const [filterKategori, setFilterKategori] = useState('semua')
 
+  // Navbar menyembunyikan menu ini untuk tamu, tapi URL-nya tetap bisa dibuka
+  // langsung (atau token kedaluwarsa di tengah sesi) — jadi halamannya punya
+  // penanganannya sendiri, bukan error 401 mentah.
+  const masuk = !!getToken()
+
   useEffect(() => {
+    if (!masuk) return setMemuat(false)
     listMyBookings()
       .then((r) => setPesanan(r.data))
       .catch((e) => setGalat(e.message))
       .finally(() => setMemuat(false))
-  }, [])
+  }, [masuk])
 
   const terlihat = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -85,6 +91,32 @@ export default function PesananSayaPage() {
 
   const jumlah = (id: Tab) =>
     id === 'semua' ? pesanan.length : pesanan.filter((p) => statusPesanan(p).tab === id).length
+
+  if (!masuk) {
+    return (
+      <div className="mx-auto max-w-[1330px] px-6 pt-12 pb-20 md:px-12">
+        <div className="mx-auto mt-10 max-w-[520px] rounded-sm border border-line bg-white px-8 py-12 text-center">
+          <h1 className="font-display text-[30px] font-semibold">Masuk dulu, ya</h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-ink/75">
+            Daftar pesanan terikat ke akun Anda. Masuk untuk melihat status pembayaran
+            dan jadwal acara yang sudah dipesan.
+          </p>
+          <Link
+            to="/masuk"
+            className="mt-7 inline-flex h-11 items-center rounded bg-navy-900 px-8 text-[15px] font-medium text-white transition-opacity hover:opacity-90"
+          >
+            Masuk
+          </Link>
+          <p className="mt-4 text-[14px] text-ink">
+            Belum punya akun?{' '}
+            <Link to="/daftar" className="font-semibold text-[#2e6b52] hover:underline">
+              Daftar
+            </Link>
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-[1330px] px-6 pt-12 pb-20 md:px-12">

@@ -284,7 +284,7 @@ export default function VendorLayananPage() {
       <AddServiceDialog
         ref={dialogRef}
         defaultNotice={defaultNotice}
-        onAdd={(s) => setServices((prev) => [...prev, s])}
+        onAdd={tambah}
       />
     </>
   )
@@ -433,9 +433,10 @@ function AddServiceDialog({
           </button>
           <button
             type="submit"
-            className="rounded-md bg-navy-900 px-5 py-2.5 text-[13px] font-semibold text-white"
+            disabled={mengirim}
+            className="rounded-md bg-navy-900 px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-60"
           >
-            Simpan Layanan
+            {mengirim ? 'Menyimpan…' : 'Simpan Layanan'}
           </button>
         </div>
       </form>

@@ -19,6 +19,58 @@ const KATEGORI: Record<string, CategoryKey> = {
   event_organizer: 'eo',
 }
 
+/** Nomor VA / kode bayar + tombol salin.
+ *
+ *  `display` dipisah dari `value` karena yang ditampilkan kadang bukan yang
+ *  disalin (nominal tampil "Rp 4.500.000", yang disalin angka mentahnya).
+ *  `bare` untuk yang sudah duduk di dalam kotak berwarna sendiri. */
+function CopyBox({
+  value,
+  display,
+  className = '',
+  bare = false,
+}: {
+  value: string
+  display: React.ReactNode
+  className?: string
+  bare?: boolean
+}) {
+  const [status, setStatus] = useState<'idle' | 'ok' | 'gagal'>('idle')
+
+  async function salin() {
+    try {
+      await navigator.clipboard.writeText(value)
+      setStatus('ok')
+    } catch {
+      // Clipboard API butuh secure context (https / localhost) dan bisa
+      // ditolak browser. Jangan diam — angkanya masih bisa diblok manual.
+      setStatus('gagal')
+    }
+    setTimeout(() => setStatus('idle'), 2000)
+  }
+
+  return (
+    <div
+      className={`flex items-center justify-between gap-4 ${
+        bare ? '' : 'rounded-sm border border-line bg-lavender/25 px-4 py-3'
+      } ${className}`}
+    >
+      <span className="font-display text-[22px] font-semibold tracking-wide break-all">
+        {display}
+      </span>
+      <button
+        type="button"
+        onClick={salin}
+        aria-label={`Salin ${value}`}
+        className="flex shrink-0 items-center gap-1.5 text-[12px] font-semibold tracking-[0.06em] text-navy-900 transition-colors hover:text-amber"
+      >
+        <CopyIcon />
+        {status === 'ok' ? 'TERSALIN' : status === 'gagal' ? 'GAGAL — SALIN MANUAL' : 'SALIN'}
+      </button>
+    </div>
+  )
+}
+
 /** Sisa waktu dalam format HH:MM:SS. */
 function countdown(msLeft: number) {
   const s = Math.max(0, Math.floor(msLeft / 1000))

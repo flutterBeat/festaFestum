@@ -1,13 +1,32 @@
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api/v1'
 
 const TOKEN_KEY = 'ff_token'
+const USER_KEY = 'ff_user'
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY)
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
+
+/** Identitas yang dipakai navbar supaya tidak perlu memanggil GET /auth/me
+ *  di tiap halaman. Bukan sumber kebenaran — otorisasi tetap di backend. */
+export function getUser(): AuthResponse['user'] | null {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    return raw ? (JSON.parse(raw) as AuthResponse['user']) : null
+  } catch {
+    return null // storage korup / diblokir browser
+  }
+}
+
+export function clearAuth() {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+}
 
 // ponytail: token di localStorage — cukup untuk demo lomba, tapi terbaca script
 // kalau ada XSS. Upgrade-nya: backend set httpOnly cookie + cors credentials.
-export const saveToken = (token: string) => localStorage.setItem(TOKEN_KEY, token)
+export function saveAuth(auth: AuthResponse) {
+  localStorage.setItem(TOKEN_KEY, auth.token)
+  localStorage.setItem(USER_KEY, JSON.stringify(auth.user))
+}
 
 /** POST JSON ke backend. Melempar Error berisi pesan dari server supaya
  *  form cukup menampilkan err.message apa adanya. */
