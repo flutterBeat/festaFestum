@@ -12,7 +12,20 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-app.use(cors());
+// Hanya percaya X-Forwarded-For kalau memang di belakang proxy (Render/Railway).
+// Kalau tidak, req.ip bisa dipalsukan dan rate limit-nya jebol.
+app.set('trust proxy', process.env.TRUST_PROXY === '1');
+
+// Origin yang boleh manggil API. Isi CORS_ORIGINS di .env waktu deploy
+// (pisah koma); default-nya dev server Vite.
+const ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:4173')
+  .split(',')
+  .map((o) => o.trim());
+
+app.use(cors({
+  // !origin = curl / Postman / webhook Midtrans, bukan browser — biarkan lewat.
+  origin: (origin, cb) => cb(null, !origin || ORIGINS.includes(origin)),
+}));
 app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

@@ -1,11 +1,13 @@
 const express = require('express');
 const { register, login, me, updateMe } = require('../controllers/auth.controller');
 const { requireAuth } = require('../middleware/authMiddleware');
+const rateLimit = require('../middleware/rateLimit');
 
 const router = express.Router();
 
-router.post('/register', register);
-router.post('/login', login);
+// Login lebih ketat dari register: login yang dibanjiri = tebak password.
+router.post('/register', rateLimit(10), register);
+router.post('/login', rateLimit(8), login);
 router.get('/me', requireAuth, me);
 router.patch('/me', requireAuth, updateMe);
 

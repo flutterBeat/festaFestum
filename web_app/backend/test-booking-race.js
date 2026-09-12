@@ -91,6 +91,12 @@ function futureDate(daysAhead = 90) {
   console.log(`201: ${created.length}  409: ${rejected.length}  lain: ${other.length}`);
   if (other.length) console.log('status lain:', other.map((r) => `${r.status} ${JSON.stringify(r.body)}`));
 
+  // Penolakan lewat Redis bunyinya beda dari penolakan lewat DB. Dipisah supaya
+  // kelihatan lapis mana yang benar-benar menangkap — kalau REDIS_URL kosong,
+  // jumlah 'lock' pasti 0.
+  const byLock = rejected.filter((r) => r.body?.message === 'Slot sedang diproses user lain').length;
+  console.log(`  ditolak lock Redis: ${byLock}  ditolak constraint DB: ${rejected.length - byLock}`);
+
   assert.strictEqual(created.length, 1, `HARUS tepat 1 booking sukses, dapat ${created.length}`);
   assert.strictEqual(other.length, 0, 'tidak boleh ada status di luar 201/409');
 
