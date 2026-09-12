@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { VendorPageHeader, StatusPill } from '../components/VendorLayout'
 import {
   ArrowRight, DownloadIcon, FilterIcon, InfoIcon, LockIcon, WalletIcon,
 } from '../components/icons'
 import { rupiahBulat } from '../lib/format'
 import {
-  getVendorBalance, listVendorBookings,
+  getVendorBalance, listVendorBookings, get, post,
   type ApiBooking, type VendorBalance,
 } from '../lib/api'
 
@@ -20,9 +20,23 @@ import {
  *  setelah tanggal acara terlampaui, dana masuk saldo tersedia dikurangi
  *  biaya platform.
  *
- *  CATATAN: tombol "Tarik Dana" belum berfungsi. Tabel payouts dan alur
- *  approval admin belum dibuat — menunggu keputusan soal endpoint /admin.
+ *  Penarikan dana masuk ke tabel payouts sebagai pengajuan berstatus
+ *  'pending' dan HARUS disetujui admin. Uang tidak pernah mengalir lewat
+ *  gateway ke vendor — transfernya di luar sistem, ini buku besarnya.
+ *  Pengajuan yang masih menunggu sudah mengurangi saldo tersedia, supaya
+ *  dana yang sama tidak bisa diajukan dua kali.
  */
+
+type Payout = {
+  payout_id: string
+  amount: string
+  status: 'pending' | 'paid' | 'rejected'
+  note: string | null
+  requested_at: string
+  decided_at: string | null
+}
+
+const labelPayout = { pending: 'Menunggu Admin', paid: 'Withdrawn', rejected: 'Ditolak' } as const
 
 
 
@@ -31,11 +45,14 @@ type Row = {
   client: string
   date: string
   amount: number
-  status: 'Released' | 'In Escrow' | 'Withdrawn'
+  status: 'Released' | 'In Escrow' | 'Withdrawn' | 'Menunggu Admin' | 'Ditolak'
 }
 
 
-const tone = { Released: 'info', 'In Escrow': 'warn', Withdrawn: 'muted' } as const
+const tone = {
+  Released: 'info', 'In Escrow': 'warn', Withdrawn: 'muted',
+  'Menunggu Admin': 'warn', Ditolak: 'danger',
+} as const
 
 /** Biaya platform tidak dikenakan pada penarikan dana, hanya pada pemasukan. */
 function feeLabel(row: Row) {
@@ -47,18 +64,51 @@ function feeLabel(row: Row) {
 export default function VendorKeuanganPage() {
   const [saldo, setSaldo] = useState<VendorBalance | null>(null)
   const [pesanan, setPesanan] = useState<ApiBooking[]>([])
+  const [payouts, setPayouts] = useState<Payout[]>([])
   const [memuat, setMemuat] = useState(true)
   const [galat, setGalat] = useState('')
 
-  useEffect(() => {
-    Promise.all([getVendorBalance(), listVendorBookings()])
-      .then(([a, b]) => {
-        setSaldo(a.balance)
-        setPesanan(b.data)
-      })
-      .catch((e) => setGalat(e.message))
-      .finally(() => setMemuat(false))
+  const [formTarik, setFormTarik] = useState(false)
+  const [nominal, setNominal] = useState('')
+  const [pesan, setPesan] = useState('')
+  const [sibuk, setSibuk] = useState(false)
+
+  const muat = useCallback(async () => {
+    try {
+      const [a, b, c] = await Promise.all([
+        getVendorBalance(),
+        listVendorBookings(),
+        get<{ data: Payout[] }>('/payouts'),
+      ])
+      setSaldo(a.balance)
+      setPesanan(b.data)
+      setPayouts(c.data)
+    } catch (e) {
+      setGalat((e as Error).message)
+    } finally {
+      setMemuat(false)
+    }
   }, [])
+
+  useEffect(() => { muat() }, [muat])
+
+  async function ajukanPenarikan(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setGalat('')
+    setPesan('')
+    setSibuk(true)
+    try {
+      await post('/payouts', { amount: Number(nominal) })
+      setNominal('')
+      setFormTarik(false)
+      setPesan('Pengajuan terkirim. Menunggu persetujuan admin.')
+      await muat()
+    } catch (e) {
+      setGalat((e as Error).message)
+    } finally {
+      setSibuk(false)
+    }
+  }
 
   if (memuat) {
     return <p className="py-20 text-center text-[14px] text-muted">Memuat keuangan...</p>
@@ -77,8 +127,8 @@ export default function VendorKeuanganPage() {
     escrowOrders: saldo.pesanan_escrow,
   }
 
-  // Riwayat dirakit dari pembayaran yang sudah sukses. Penarikan dana belum
-  // ada barisnya karena tabel payouts belum dibuat.
+  // Riwayat = pembayaran masuk + pengajuan penarikan (nominal negatif),
+  // diurutkan bersama supaya arus kasnya terbaca sebagai satu daftar.
   const today = new Date(new Date().toDateString())
   const history: Row[] = pesanan.flatMap((b) =>
     b.payments
@@ -92,6 +142,20 @@ export default function VendorKeuanganPage() {
         amount: Number(p.amount),
         status: new Date(b.event_date) < today ? 'Released' : 'In Escrow',
       }))
+  )
+
+  history.push(
+    ...payouts.map((po) => ({
+      id: po.payout_id.slice(0, 8).toUpperCase(),
+      client: po.note ? `Penarikan dana — ${po.note}` : 'Penarikan dana',
+      date: new Date(po.requested_at).toLocaleDateString('id-ID', {
+        day: '2-digit', month: 'short', year: 'numeric',
+      }),
+      // Ditolak tidak mengurangi saldo, jadi ditulis positif supaya tidak
+      // terbaca seperti uang yang keluar.
+      amount: po.status === 'rejected' ? Number(po.amount) : -Number(po.amount),
+      status: labelPayout[po.status] as Row['status'],
+    }))
   )
 
   return (
@@ -119,18 +183,68 @@ export default function VendorKeuanganPage() {
           </p>
           <p className="mt-1 text-[13px] text-ink/70">Siap untuk ditarik ke rekening terdaftar.</p>
 
-          <div className="mt-6 flex items-center gap-5 border-t border-line pt-5">
-            <button
-              type="button"
-              disabled={!saldo.penarikan_aktif}
-              title="Penarikan dana belum tersedia — menunggu alur approval admin"
-              className="rounded-md bg-navy-900 px-5 py-2.5 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              Tarik Dana
-            </button>
-            <button type="button" className="text-[13px] font-medium underline underline-offset-4">
-              Atur Rekening
-            </button>
+          <div className="mt-6 border-t border-line pt-5">
+            {!formTarik ? (
+              <button
+                type="button"
+                disabled={!saldo.penarikan_aktif || balance.available <= 0}
+                title={balance.available <= 0 ? 'Belum ada saldo yang bisa ditarik' : undefined}
+                onClick={() => { setFormTarik(true); setPesan('') }}
+                className="rounded-md bg-navy-900 px-5 py-2.5 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Tarik Dana
+              </button>
+            ) : (
+              <form onSubmit={ajukanPenarikan}>
+                <label htmlFor="nominal" className="block text-[13px] font-semibold">
+                  Nominal penarikan
+                </label>
+                <input
+                  id="nominal"
+                  type="number"
+                  min={1}
+                  max={balance.available}
+                  required
+                  autoFocus
+                  value={nominal}
+                  onChange={(e) => setNominal(e.target.value)}
+                  placeholder={String(balance.available)}
+                  className="mt-2 h-11 w-full rounded border border-line px-4 text-[14px] outline-none focus:border-navy-900"
+                />
+                <p className="mt-2 text-[12px] text-ink/65">
+                  Maksimal {rupiahBulat(balance.available)}. Pengajuan diperiksa admin dulu.
+                </p>
+                <div className="mt-3 flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={sibuk}
+                    className="rounded-md bg-navy-900 px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
+                  >
+                    {sibuk ? 'Mengirim…' : 'Ajukan'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setFormTarik(false); setGalat('') }}
+                    className="text-[13px] font-medium underline underline-offset-4"
+                  >
+                    Batal
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {pesan && <p className="mt-3 text-[13px] font-semibold text-[#2e6b52]">{pesan}</p>}
+            {galat && (
+              <p role="alert" className="mt-3 text-[13px] text-maroon">
+                {galat}
+              </p>
+            )}
+            {saldo.menunggu_persetujuan > 0 && (
+              <p className="mt-3 text-[12px] text-ink/65">
+                {rupiahBulat(saldo.menunggu_persetujuan)} sedang menunggu persetujuan admin dan sudah
+                dikurangi dari saldo tersedia.
+              </p>
+            )}
           </div>
         </section>
 

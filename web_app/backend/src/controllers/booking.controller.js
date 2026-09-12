@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { hitungSaldo, vendorIdMilik } = require('../lib/saldo');
 const { acquireLock, lockHolder, releaseLock } = require('../config/redis');
 
 const VALID_SLOTS = ['pagi', 'siang', 'malam'];
@@ -289,45 +290,20 @@ async function vendorStats(req, res, next) {
 // lewat; setelah tanggal acara terlampaui, dana masuk SALDO TERSEDIA dikurangi
 // biaya platform. Penarikan dana belum ada (tabel payouts belum dibuat,
 // menunggu keputusan alur approval admin).
-const PLATFORM_FEE_RATE = 0.025;
 
 async function vendorBalance(req, res, next) {
   try {
-    const { rows } = await pool.query(
-      `WITH lunas AS (
-         SELECT p.amount, sch.event_date
-           FROM payments p
-           JOIN bookings bk ON bk.booking_id = p.booking_id
-           JOIN services s  ON s.service_id  = bk.service_id
-           JOIN vendors  v  ON v.vendor_id   = s.vendor_id
-           JOIN vendor_schedules sch ON sch.schedule_id = bk.schedule_id
-          WHERE v.owner_user_id = $1 AND p.gateway_status = 'success'
-       )
-       SELECT
-         COALESCE(SUM(amount) FILTER (WHERE event_date <  CURRENT_DATE), 0) AS dirilis_kotor,
-         COALESCE(SUM(amount) FILTER (WHERE event_date >= CURRENT_DATE), 0) AS escrow,
-         COALESCE(SUM(amount), 0) AS total_masuk,
-         count(*) FILTER (WHERE event_date >= CURRENT_DATE)::int AS pesanan_escrow
-       FROM lunas`,
-      [req.user.user_id]
-    );
+    const vendorId = await vendorIdMilik(pool, req.user.user_id);
+    if (!vendorId) {
+      return res.status(404).json({ message: 'Anda belum memiliki profil vendor' });
+    }
 
-    const r = rows[0];
-    const kotor = Number(r.dirilis_kotor);
-    const fee = Math.round(kotor * PLATFORM_FEE_RATE);
+    const saldo = await hitungSaldo(pool, vendorId);
 
-    res.json({
-      balance: {
-        saldo_tersedia: kotor - fee,
-        escrow: Number(r.escrow),
-        total_masuk: Number(r.total_masuk),
-        biaya_platform: fee,
-        platform_fee_rate: PLATFORM_FEE_RATE,
-        pesanan_escrow: r.pesanan_escrow,
-        // Penarikan belum tersedia — lihat catatan di atas.
-        penarikan_aktif: false,
-      },
-    });
+    // Rumusnya dipakai bersama dengan pemeriksaan batas di POST /payouts —
+    // lihat src/lib/saldo.js. Payout yang masih menunggu persetujuan sudah
+    // ikut dikurangi di sana, jadi angka ini tidak bisa ditarik dua kali.
+    res.json({ balance: { ...saldo, penarikan_aktif: true } });
   } catch (err) {
     next(err);
   }

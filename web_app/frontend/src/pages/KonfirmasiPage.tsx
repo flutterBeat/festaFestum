@@ -83,13 +83,14 @@ export default function KonfirmasiPage() {
                 <p className="text-[11px] font-semibold tracking-[0.06em] text-ink/70">ID PESANAN</p>
                 <p className="mt-1 font-display text-[24px] font-semibold">{`#${booking.booking_id.slice(0, 8).toUpperCase()}`}</p>
               </div>
-              {/* Belum ada berkasnya — nanti PDF dari backend. */}
-              <button
-                type="button"
+              {/* Mengarah ke invoice; unduhannya lewat dialog cetak browser
+                  ("Simpan sebagai PDF"), jadi tidak perlu berkas dari backend. */}
+              <Link
+                to={`/invoice/${bookingId}`}
                 className="rounded-sm bg-[#efe2fb] px-5 py-2.5 text-[14px] text-[#5b2a86] transition-opacity hover:opacity-90"
               >
                 Unduh Tanda Bukti
-              </button>
+              </Link>
             </div>
 
             <div className="p-6">

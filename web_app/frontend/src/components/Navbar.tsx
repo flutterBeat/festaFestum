@@ -49,7 +49,7 @@ export default function Navbar() {
         {user ? (
           <div className="flex items-center gap-3">
             <Link
-              to={user.role === 'vendor' ? '/vendor' : '/pesanan'}
+              to={user.role === 'vendor_owner' ? '/vendor' : '/profil'}
               className="flex items-center gap-2.5"
               title={user.email}
             >

@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom'
+import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import LandingPage from './pages/LandingPage'
@@ -18,6 +19,7 @@ import VenueOrderPage from './pages/VenueOrderPage'
 import CheckoutPage from './pages/CheckoutPage'
 import VirtualAccountPage from './pages/VirtualAccountPage'
 import KonfirmasiPage from './pages/KonfirmasiPage'
+import InvoicePage from './pages/InvoicePage'
 import PesananSayaPage from './pages/PesananSayaPage'
 import FestaAiPage from './pages/FestaAiPage'
 import LoginPage from './pages/LoginPage'
@@ -28,16 +30,62 @@ import VendorPemesananPage from './pages/VendorPemesananPage'
 import VendorJadwalPage from './pages/VendorJadwalPage'
 import VendorLayananPage from './pages/VendorLayananPage'
 import VendorKeuanganPage from './pages/VendorKeuanganPage'
+import VendorLoginPage from './pages/VendorLoginPage'
+import VendorRegisterPage from './pages/VendorRegisterPage'
+import VendorDokumenPage from './pages/VendorDokumenPage'
+import VendorOnboardingPage from './pages/VendorOnboardingPage'
+import ProfilPage from './pages/ProfilPage'
+import AdminLoginPage from './pages/AdminLoginPage'
+import AdminLayout from './components/AdminLayout'
+import AdminVendorPage from './pages/AdminVendorPage'
+import AdminRingkasanPage from './pages/AdminRingkasanPage'
+import AdminEscrowPage from './pages/AdminEscrowPage'
+import AdminAkunPage from './pages/AdminAkunPage'
 
 /** Navbar + Footer hanya untuk halaman situs. Halaman auth full-screen,
- *  jadi dia duduk di luar layout ini. */
+ *  jadi dia duduk di luar layout ini.
+ *
+ *  Transisi antar halaman ada di sini: <AnimatePresence mode="wait"> menunggu
+ *  halaman lama selesai keluar sebelum yang baru masuk, jadi keduanya tidak
+ *  pernah bertumpuk. Kuncinya pathname — tiap rute dianggap elemen berbeda.
+ *
+ *  POSISI SCROLL DIRESET di onExitComplete — tepat setelah halaman lama
+ *  hilang dan sebelum yang baru muncul. Tanpa ini, pindah dari halaman
+ *  panjang bikin halaman baru terbuka di posisi tengah, dan sisa halaman
+ *  lama masih terlihat sekejap.
+ *
+ *  `behavior: 'instant'` wajib: html punya scroll-behavior: smooth untuk
+ *  tautan anchor, dan tanpa override ini reset posisinya ikut dianimasikan
+ *  pelan — itu justru sumber kesan "tidak benar-benar pindah".
+ *
+ *  Keluarnya tetap lebih cepat daripada masuknya (0,22s vs 0,52s): mata
+ *  lebih memaafkan halaman baru yang datang perlahan daripada halaman lama
+ *  yang lambat pergi. Kalau mau disetel, dua angka `duration` di bawah ini
+ *  yang diubah — tidak ada tempat lain.
+ *
+ *  Animasi saat di-scroll ada di komponen <Reveal>, dipakai per bagian
+ *  halaman yang memang perlu. */
 function SiteLayout() {
+  const { pathname } = useLocation()
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
-      <main className="flex-1">
-        <Outlet />
-      </main>
+      <AnimatePresence
+        mode="wait"
+        initial={false}
+        onExitComplete={() => window.scrollTo({ top: 0, behavior: 'instant' })}
+      >
+        <motion.main
+          key={pathname}
+          className="flex-1"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0, transition: { duration: 0.52, ease: [0.22, 0.61, 0.36, 1] } }}
+          exit={{ opacity: 0, transition: { duration: 0.22, ease: 'easeIn' } }}
+        >
+          <Outlet />
+        </motion.main>
+      </AnimatePresence>
       <Footer />
     </div>
   )
@@ -46,6 +94,7 @@ function SiteLayout() {
 export default function App() {
   return (
     <BrowserRouter>
+      <MotionConfig reducedMotion="user">
       <Routes>
         <Route element={<SiteLayout />}>
           <Route path="/" element={<LandingPage />} />
@@ -61,6 +110,7 @@ export default function App() {
           <Route path="/event-organizer/:id" element={<EoDetailPage />} />
           <Route path="/pesanan" element={<PesananSayaPage />} />
           <Route path="/festa-ai" element={<FestaAiPage />} />
+          <Route path="/profil" element={<ProfilPage />} />
         </Route>
         {/* Halaman pengisian pesanan punya header/footer sendiri (tanpa
             navigasi) supaya user tidak keluar alur di tengah pengisian. */}
@@ -72,6 +122,15 @@ export default function App() {
         <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
         <Route path="/pembayaran/:paymentId" element={<VirtualAccountPage />} />
         <Route path="/pesanan/selesai/:bookingId" element={<KonfirmasiPage />} />
+        {/* Invoice punya tata letak cetak sendiri, jadi di luar SiteLayout. */}
+        <Route path="/invoice/:bookingId" element={<InvoicePage />} />
+        {/* Auth & onboarding vendor: layar penuh sendiri, di luar VendorLayout
+            karena sidebar dashboard belum relevan sebelum profilnya jadi. */}
+        <Route path="/vendor/masuk" element={<VendorLoginPage />} />
+        <Route path="/vendor/daftar" element={<VendorRegisterPage />} />
+        <Route path="/vendor/dokumen" element={<VendorDokumenPage />} />
+        <Route path="/vendor/onboarding" element={<VendorOnboardingPage />} />
+
         {/* Sisi vendor: sidebar sendiri, tanpa navbar/footer marketplace. */}
         <Route path="/vendor" element={<VendorLayout />}>
           <Route index element={<VendorDashboardPage />} />
@@ -81,9 +140,20 @@ export default function App() {
           <Route path="keuangan" element={<VendorKeuanganPage />} />
         </Route>
 
+        {/* Pusat Kendali admin. Tidak ada rute pendaftaran — akun admin
+            dibuat langsung di database. */}
+        <Route path="/admin/masuk" element={<AdminLoginPage />} />
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminRingkasanPage />} />
+          <Route path="vendor" element={<AdminVendorPage />} />
+          <Route path="escrow" element={<AdminEscrowPage />} />
+          <Route path="akun" element={<AdminAkunPage />} />
+        </Route>
+
         <Route path="/masuk" element={<LoginPage />} />
         <Route path="/daftar" element={<RegisterPage />} />
       </Routes>
+      </MotionConfig>
     </BrowserRouter>
   )
 }

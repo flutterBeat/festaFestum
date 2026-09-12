@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { VendorPageHeader, StatusPill } from '../components/VendorLayout'
 import { shifts } from '../data/shifts'
 import { rupiahBulat } from '../lib/format'
@@ -127,6 +128,14 @@ export default function VendorPemesananPage() {
                         <p className="mt-2 max-w-[280px] whitespace-pre-line text-[12px] leading-relaxed text-ink/75">
                           {b.event_location_detail}
                         </p>
+                        {/* Endpoint booking boleh dibuka vendor yang dipesan,
+                            jadi invoice yang sama dipakai kedua sisi. */}
+                        <Link
+                          to={`/invoice/${b.booking_id}`}
+                          className="mt-3 inline-block text-[12px] font-semibold text-navy-900 underline underline-offset-4"
+                        >
+                          Lihat invoice
+                        </Link>
                       </details>
                     </td>
                   </tr>

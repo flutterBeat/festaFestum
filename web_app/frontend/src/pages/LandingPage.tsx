@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Img from '../components/Img'
+import Reveal from '../components/Reveal'
 import { listVendors, type ApiVendor } from '../lib/api'
 import { categories, namaKota, type CategoryKey } from '../data/categories'
 
@@ -102,7 +103,7 @@ export default function LandingPage() {
       </section>
 
       {/* KATEGORI */}
-      <section className="mx-auto max-w-[1290px] px-6 pt-14 md:px-12">
+      <Reveal className="mx-auto max-w-[1290px] px-6 pt-14 md:px-12">
         <h2 className="font-display text-[26px] font-semibold">
           Temukan Vendor Sesuai Kebutuhan Anda
         </h2>
@@ -122,10 +123,10 @@ export default function LandingPage() {
             </Link>
           ))}
         </div>
-      </section>
+      </Reveal>
 
       {/* REKOMENDASI */}
-      <section className="mx-auto max-w-[1290px] px-6 pt-24 md:px-12">
+      <Reveal className="mx-auto max-w-[1290px] px-6 pt-24 md:px-12">
         <div className="flex items-end justify-between">
           <div>
             <h2 className="font-display text-[30px] font-semibold">Rekomendasi Vendor</h2>
@@ -203,10 +204,10 @@ export default function LandingPage() {
             })}
           </div>
         </div>
-      </section>
+      </Reveal>
 
       {/* 3 LANGKAH */}
-      <section className="mx-auto max-w-[1290px] px-6 pt-24 md:px-12">
+      <Reveal className="mx-auto max-w-[1290px] px-6 pt-24 md:px-12">
         <div className="bg-lavender px-8 py-14 md:px-16">
           <h2 className="text-center font-display text-[26px] font-semibold">
             Rencanakan Acara dalam 3 Langkah
@@ -226,7 +227,7 @@ export default function LandingPage() {
             ))}
           </div>
         </div>
-      </section>
+      </Reveal>
 
       <div className="pt-24">
         <AiBanner

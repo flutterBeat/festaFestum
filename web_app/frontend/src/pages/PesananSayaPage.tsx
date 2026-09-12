@@ -299,6 +299,13 @@ export default function PesananSayaPage() {
                     LIHAT PROFIL VENDOR
                   </Link>
 
+                  <Link
+                    to={`/invoice/${p.booking_id}`}
+                    className="rounded-sm border border-line px-3.5 py-2 text-[10px] font-semibold tracking-[0.04em] transition-colors hover:border-navy-900"
+                  >
+                    INVOICE
+                  </Link>
+
                   {/* Tagihan yang masih menggantung bisa dibuka lagi. */}
                   {tertunda && (
                     <Link

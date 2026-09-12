@@ -248,6 +248,9 @@ export type VendorBalance = {
   biaya_platform: number
   platform_fee_rate: number
   pesanan_escrow: number
+  /** Payout 'pending' + 'paid'; sudah ikut dikurangi dari saldo_tersedia. */
+  sudah_ditarik: number
+  menunggu_persetujuan: number
   penarikan_aktif: boolean
 }
 
@@ -275,9 +278,9 @@ export const tambahSlot = (slots: { event_date: string; time_slot: string }[]) =
 export const tambahLayanan = (vendorId: string, body: Record<string, unknown>) =>
   post<{ service: ApiService }>(`/vendors/${vendorId}/services`, body)
 
-/** PATCH & DELETE belum ada helper-nya di sini karena `post`/`get` cuma
+/** PUT, PATCH & DELETE belum ada helper-nya di sini karena `post`/`get` cuma
  *  menangani dua metode itu. Ditambahkan saat halaman Layanan butuh edit. */
-export async function kirim<T>(path: string, method: 'PATCH' | 'DELETE', body?: unknown): Promise<T> {
+export async function kirim<T>(path: string, method: 'PUT' | 'PATCH' | 'DELETE', body?: unknown): Promise<T> {
   let res: Response
   try {
     res = await fetch(BASE + path, {

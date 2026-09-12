@@ -1,4 +1,6 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { cekAkses } from './PenjagaAkses'
+import { clearAuth, getUser } from '../lib/api'
 import Img from './Img'
 import {
   GridIcon, CalendarIcon, ClockIcon, FolderIcon, WalletIcon,
@@ -7,7 +9,10 @@ import {
 
 /** Kerangka dashboard vendor: sidebar kiri tetap + topbar, isinya lewat
  *  <Outlet />. Sengaja terpisah dari SiteLayout karena sisi vendor tidak
- *  memakai navbar/footer marketplace sama sekali. */
+ *  memakai navbar/footer marketplace sama sekali.
+ *
+ *  Semua halaman vendor lewat sini, jadi penjaga aksesnya cukup satu di
+ *  layout ini — sama seperti AdminLayout. Lihat PenjagaAkses.tsx. */
 
 const menu = [
   { to: '/vendor', label: 'Dashboard', icon: GridIcon, end: true },
@@ -21,6 +26,17 @@ const menu = [
 ]
 
 export default function VendorLayout() {
+  const navigate = useNavigate()
+  const tolak = cekAkses('vendor_owner', '/vendor/masuk')
+  if (tolak) return tolak
+
+  const user = getUser()
+
+  function keluar() {
+    clearAuth()
+    navigate('/vendor/masuk')
+  }
+
   return (
     <div className="flex min-h-screen bg-[#f7f8fc]">
       <aside className="sticky top-0 hidden h-screen w-[258px] shrink-0 flex-col border-r border-line bg-white lg:flex">
@@ -55,11 +71,17 @@ export default function VendorLayout() {
         </nav>
 
         <div className="mt-auto border-t border-line p-5">
+          {/* Mockup menaruh "Mulai Sesi Baru" di sini, tapi tombol itu tidak
+              punya arti apa pun di aplikasi ini. Slotnya dipakai untuk keluar,
+              yang memang dibutuhkan vendor. */}
+          <p className="truncate text-[13px] font-semibold text-ink">{user?.name ?? 'Vendor'}</p>
+          <p className="truncate text-[12px] text-muted">{user?.email}</p>
           <button
             type="button"
-            className="w-full rounded-md bg-navy-900 py-3 text-[13px] font-semibold text-white"
+            onClick={keluar}
+            className="mt-4 w-full rounded-md bg-navy-900 py-3 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
           >
-            Mulai Sesi Baru
+            Keluar
           </button>
           <div className="mt-5 flex justify-around text-[12px] text-ink/70">
             <span className="flex items-center gap-1.5">
@@ -82,6 +104,13 @@ export default function VendorLayout() {
             <BellIcon />
             <ChatIcon />
             <UserCircleIcon className="h-6 w-6" />
+            <button
+              type="button"
+              onClick={keluar}
+              className="rounded-md border border-line px-4 py-1.5 text-[12px] font-semibold text-ink/80 transition-colors hover:border-navy-900 hover:text-navy-900 lg:hidden"
+            >
+              Keluar
+            </button>
           </div>
         </header>
 
@@ -122,11 +151,18 @@ export function VendorPageHeader({
 }
 
 /** Pil status berwarna yang dipakai di tabel pesanan & riwayat payout. */
-export function StatusPill({ tone, children }: { tone: 'info' | 'warn' | 'muted'; children: React.ReactNode }) {
+export function StatusPill({
+  tone,
+  children,
+}: {
+  tone: 'info' | 'warn' | 'muted' | 'danger'
+  children: React.ReactNode
+}) {
   const tones = {
     info: 'bg-lavender/60 text-navy-900',
     warn: 'border border-amber/60 bg-amber/12 text-[#8a5a06]',
     muted: 'bg-stone-100 text-ink/70',
+    danger: 'border border-maroon/40 bg-maroon/5 text-maroon',
   }
   return (
     <span className={`inline-block rounded-full px-3 py-1 text-[12px] font-medium ${tones[tone]}`}>

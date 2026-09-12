@@ -31,3 +31,13 @@ body {
   background-color: var(--color-cream);
   color: var(--color-ink);
 }
+
+/* Animasi halaman & scroll ditangani library `motion` (lihat App.tsx dan
+   components/Reveal.tsx), jadi tidak ada keyframes buatan tangan di sini.
+   Yang tersisa cuma scroll-behavior, yang tetap perlu dimatikan untuk
+   pengguna yang memilih gerakan minimal. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
