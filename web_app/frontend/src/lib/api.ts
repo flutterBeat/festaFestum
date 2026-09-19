@@ -302,9 +302,13 @@ export type ApiBooking = {
   payments: ApiPayment[]
 }
 
+/** `quantity` = berapa buket (florist), berapa setel (sewa), berapa orang
+ *  (MUA). Tidak dikirim berarti 1. Backend mengalikan harga dan DP dengan
+ *  angka ini, dan untuk florist/sewa ikut memotong kapasitas harian vendor
+ *  sebanyak itu — untuk MUA tetap memotong 1, karena yang habis timnya. */
 export const buatBooking = (body: {
   service_id: string; event_date: string; time_slot: string
-  event_type: string; event_location_detail: string
+  event_type: string; event_location_detail: string; quantity?: number
 }) => post<{ booking: ApiBooking }>('/bookings', body)
 
 /** Vendor menjawab pesanan yang masuk. `note` opsional — dipakai untuk
@@ -387,7 +391,6 @@ export type VendorStats = {
   menunggu_dp: number
   lunas: number
   selesai_minggu_ini: number
-  slot_tersedia: number
 }
 
 export type VendorBalance = {
@@ -403,14 +406,21 @@ export type VendorBalance = {
   penarikan_aktif: boolean
 }
 
+/** Satu petak kalender vendor. Sejak migrasi 013 endpoint ini membalas GRID
+ *  penuh, bukan cuma baris yang ada — 'tidak ada baris' sekarang berarti
+ *  tersedia, jadi petak kosong harus ikut dikirim.
+ *
+ *  schedule_id cuma terisi untuk petak 'blocked' (penutupan yang dibuat
+ *  vendor); itu satu-satunya yang punya baris di DB dan bisa dicabut. */
 export type ApiSchedule = {
-  schedule_id: string
+  schedule_id: string | null
   event_date: string
   time_slot: string
-  status: 'available' | 'held' | 'booked' | 'blocked'
+  status: 'available' | 'booked' | 'blocked'
   booking_id: string | null
   payment_status: string | null
   customer_name: string | null
+  jumlah_pesanan: number
 }
 
 export const listVendorBookings = () => get<{ data: ApiBooking[] }>('/bookings/vendor')
@@ -462,10 +472,18 @@ export const urlFotoVendor = (vendorId: string, slot = 0, v?: string | number) =
   `${BASE}/vendors/${vendorId}/photo/${slot}${v ? `?v=${v}` : ''}`
 
 export const listMySchedules = (from: string, to: string) =>
-  get<{ data: ApiSchedule[] }>('/schedules/me', { from, to })
+  get<{ data: ApiSchedule[]; daily_capacity: number }>('/schedules/me', { from, to })
 
-export const tambahSlot = (slots: { event_date: string; time_slot: string }[]) =>
-  post<{ created: number }>('/schedules', { slots })
+/** MENUTUP slot, bukan membukanya — lihat catatan di VendorJadwalPage.
+ *  Dibalas 409 kalau ada pesanan aktif di slot yang mau ditutup. */
+export const tutupSlot = (slots: { event_date: string; time_slot: string }[]) =>
+  post<{ ditutup: number; dilewati: number; schedules: ApiSchedule[] }>('/schedules', { slots })
+
+/** Berapa pesanan yang sanggup dilayani vendor dalam sehari. Untuk MUA dan
+ *  fotografer ini jumlah tim; untuk florist dan sewa jas/kebaya jumlah unit
+ *  yang bisa keluar per hari. */
+export const ubahKapasitas = (vendorId: string, daily_capacity: number) =>
+  kirim<{ vendor: ApiVendor }>(`/vendors/${vendorId}`, 'PATCH', { daily_capacity })
 
 export const tambahLayanan = (vendorId: string, body: Record<string, unknown>) =>
   post<{ service: ApiService }>(`/vendors/${vendorId}/services`, body)

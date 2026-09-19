@@ -76,10 +76,8 @@ async function muncul(query) {
   );
 
   const TGL = futureDate(20);
-  await api('/schedules', {
-    method: 'POST', token,
-    body: { slots: [{ event_date: TGL, time_slot: 'pagi' }] },
-  });
+  // Tidak ada slot yang perlu dibuka: sejak migrasi 013 vendor tersedia
+  // secara bawaan, dan POST /schedules justru MENUTUP tanggal.
 
   console.log('\nSchedule-first discovery:');
 
@@ -98,11 +96,24 @@ async function muncul(query) {
   );
   ok('hilang saat tanggal terlalu mepet (minimum_notice_days ditegakkan)');
 
+  // Kebalikan dari sebelumnya: shift yang tidak disebut apa-apa sekarang
+  // TERSEDIA. Yang membuat vendor hilang adalah penutupan yang dia buat
+  // sendiri, jadi itu yang diuji.
+  assert.ok(
+    await muncul(`category=florist&event_date=${TGL}&time_slot=malam`),
+    'harusnya muncul: shift malam tidak ditutup siapa pun'
+  );
+  ok('muncul di shift yang tidak ditutup');
+
+  await api('/schedules', {
+    method: 'POST', token,
+    body: { slots: [{ event_date: TGL, time_slot: 'malam' }] },
+  });
   assert.ok(
     !(await muncul(`category=florist&event_date=${TGL}&time_slot=malam`)),
-    'harusnya TIDAK muncul: slot malam tidak dibuka'
+    'harusnya TIDAK muncul: shift malam sudah ditutup vendor'
   );
-  ok('hilang saat shift yang diminta tidak dibuka');
+  ok('hilang saat vendor menutup shift itu');
 
   // --- Inti pengujian ----------------------------------------------------
   // Layanan florist dinonaktifkan, layanan photographer TETAP aktif dan

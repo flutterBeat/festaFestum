@@ -63,12 +63,8 @@ function futureDate(daysAhead = 90) {
   const serviceId = service.body.service.service_id;
 
   const eventDate = futureDate();
-  const sch = await api('/schedules', {
-    method: 'POST', token: vendorToken,
-    body: { slots: [{ event_date: eventDate, time_slot: 'pagi' }] },
-  });
-  assert.strictEqual(sch.status, 201, `buat schedule gagal: ${JSON.stringify(sch.body)}`);
-  assert.strictEqual(sch.body.created, 1, 'slot harusnya dibuat 1');
+  // Tidak ada slot yang perlu dibuka: sejak migrasi 013 vendor tersedia secara
+  // bawaan, dan POST /schedules justru MENUTUP tanggal.
 
   const check = await api('/schedules/check', {
     method: 'POST',

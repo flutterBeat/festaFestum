@@ -64,10 +64,8 @@ const ok = (l) => { langkah++; console.log(`  ${String(langkah).padStart(2)}. ${
   });
 
   const TGL = futureDate(15);
-  await api('/schedules', {
-    method: 'POST', token: vendorToken,
-    body: { slots: [{ event_date: TGL, time_slot: 'pagi' }] },
-  });
+  // Tidak ada slot yang perlu dibuka: sejak migrasi 013 vendor tersedia
+  // secara bawaan, dan POST /schedules justru MENUTUP tanggal.
 
   console.log('\nAlur customer (persis seperti yang dipanggil frontend):');
 
@@ -84,7 +82,7 @@ const ok = (l) => { langkah++; console.log(`  ${String(langkah).padStart(2)}. ${
   const tersedia = await api(`/vendors?category=florist&event_date=${TGL}&time_slot=pagi&limit=24`);
   assert.ok(
     tersedia.body.data.some((v) => v.vendor_id === vendorId),
-    'vendor hilang dari filter schedule-first padahal slotnya dibuka'
+    'vendor hilang dari filter schedule-first padahal tanggalnya tidak ditutup'
   );
   ok('Filter tanggal + shift: vendor tetap muncul');
 

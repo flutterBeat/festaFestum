@@ -62,14 +62,10 @@ const ok = (l) => { pass++; console.log(`  OK  ${l}`); };
   });
 
   const TGL = futureDate(10);
-  // Slot kedua sengaja di tanggal LAIN. Vendornya event_organizer, dan sejak
-  // aturan kunci-seharian berlaku, memesan TGL menutup semua shift lain di
-  // TGL juga — slot bebas yang dihitung stats harus datang dari tanggal lain.
+  // Vendornya event_organizer (kapasitas 1), jadi memesan TGL membuat
+  // seluruh TGL penuh. Tanggal lain dipakai untuk memeriksa bahwa kalender
+  // vendor tetap menampilkan sisa hari sebagai tersedia.
   const TGL_LAIN = futureDate(11);
-  await api('/schedules', {
-    method: 'POST', token: vendorToken,
-    body: { slots: [{ event_date: TGL, time_slot: 'pagi' }, { event_date: TGL_LAIN, time_slot: 'malam' }] },
-  });
 
   const booking = await api('/bookings', {
     method: 'POST', token: customerToken,
@@ -132,10 +128,9 @@ const ok = (l) => { pass++; console.log(`  OK  ${l}`); };
   assert.strictEqual(stats.status, 200, `stats gagal: ${JSON.stringify(stats.body)}`);
   assert.strictEqual(stats.body.stats.total_pesanan, 1);
   assert.strictEqual(stats.body.stats.menunggu_dp, 1);
-  assert.ok(stats.body.stats.slot_tersedia >= 1, 'slot tersedia harusnya >= 1');
   ok(`stats: ${stats.body.stats.total_pesanan} pesanan, `
     + `${stats.body.stats.menunggu_dp} menunggu DP, `
-    + `${stats.body.stats.slot_tersedia} slot bebas`);
+    + `${stats.body.stats.perlu_dijawab} perlu dijawab`);
 
   // --- Saldo: DP belum dibayar, jadi semuanya masih nol ------------------
   const saldo0 = await api('/bookings/vendor/balance', { token: vendorToken });
@@ -172,11 +167,22 @@ const ok = (l) => { pass++; console.log(`  OK  ${l}`); };
     token: vendorToken,
   });
   assert.strictEqual(jadwal.status, 200, `jadwal gagal: ${JSON.stringify(jadwal.body)}`);
-  assert.strictEqual(jadwal.body.data.length, 2, 'harusnya 2 slot');
+  // Grid penuh: 31 hari x 3 shift. Dulu endpoint ini cuma membalas baris yang
+  // ada; sekarang "tidak ada baris" berarti tersedia, jadi kalender vendor
+  // perlu dikirimi seluruh petaknya.
+  assert.strictEqual(jadwal.body.data.length, 31 * 3, 'harusnya grid 31 hari x 3 shift');
   const dipesan = jadwal.body.data.find((s) => s.booking_id);
   assert.ok(dipesan, 'slot yang dipesan tidak membawa booking_id');
   assert.ok(dipesan.customer_name, 'nama customer tidak ikut di kalender');
-  ok(`GET /schedules/me: 2 slot, yang dipesan membawa nama customer`);
+  assert.strictEqual(dipesan.status, 'booked', 'slot terpesan harusnya booked');
+  // Vendornya event_organizer berkapasitas 1, jadi SELURUH tanggal itu penuh,
+  // bukan cuma shift yang dipesan. Ini pengganti aturan kunci-seharian lama.
+  const sehari = jadwal.body.data.filter((s) => s.event_date === dipesan.event_date);
+  assert.ok(sehari.every((s) => s.status === 'booked'),
+    'kapasitas 1: semua shift di tanggal itu harusnya penuh');
+  assert.ok(jadwal.body.data.some((s) => s.status === 'available'),
+    'tanggal lain harusnya masih tersedia');
+  ok('GET /schedules/me: grid sebulan, tanggal terpesan penuh, sisanya tersedia');
 
   const tanpaRentang = await api('/schedules/me', { token: vendorToken });
   assert.strictEqual(tanpaRentang.status, 400, 'rentang tanggal harusnya wajib');

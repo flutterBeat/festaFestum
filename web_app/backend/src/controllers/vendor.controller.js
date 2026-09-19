@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { BOOKING_AKTIF } = require('../lib/kategori');
 const { gambarBermasalah } = require('../lib/gambar');
 
 const VALID_CITIES = [
@@ -107,7 +108,6 @@ async function listVendors(req, res, next) {
     // justru penuh. Yang harus tersedia adalah layanan DI KATEGORI ITU.
     if (category || event_date) {
       const syarat = ['s.vendor_id = v.vendor_id', 's.is_active = TRUE'];
-      let join = '';
 
       if (category) {
         values.push(category);
@@ -121,17 +121,38 @@ async function listVendors(req, res, next) {
         values.push(time_slot);
         const pSlot = values.length;
 
-        join = `JOIN vendor_schedules sch
-                  ON sch.vendor_id = s.vendor_id
-                 AND sch.event_date = $${pDate}::date
-                 AND sch.time_slot  = $${pSlot}::time_slot`;
-        syarat.push("sch.status = 'available'");
         // Lead time per layanan, aturan yang sama dengan POST /schedules/check.
         syarat.push(`$${pDate}::date >= CURRENT_DATE + s.minimum_notice_days`);
+
+        // Ketersediaan diturunkan, tidak dibaca dari kolom status. Dulu di sini
+        // ada JOIN ke vendor_schedules yang menuntut baris 'available' — itu
+        // sebabnya vendor tanpa slot terbuka hilang dari pencarian, dan seed
+        // harus mengarang 30 hari ketersediaan supaya vendor kelihatan hidup.
+        // Tiga syarat ini sama persis dengan yang dibaca createBooking.
+        syarat.push(`NOT EXISTS (
+          SELECT 1 FROM vendor_schedules vs
+           WHERE vs.vendor_id = v.vendor_id
+             AND vs.event_date = $${pDate}::date
+             AND vs.time_slot = $${pSlot}::time_slot
+        )`);
+        syarat.push(`NOT EXISTS (
+          SELECT 1 FROM bookings bk
+           WHERE bk.vendor_id = v.vendor_id
+             AND bk.event_date = $${pDate}::date
+             AND bk.time_slot = $${pSlot}::time_slot
+             AND bk.kunci_shift AND bk.${BOOKING_AKTIF}
+        )`);
+        syarat.push(`COALESCE((
+          SELECT SUM(CASE WHEN bk.kunci_shift THEN 1 ELSE bk.quantity END)
+            FROM bookings bk
+           WHERE bk.vendor_id = v.vendor_id
+             AND bk.event_date = $${pDate}::date
+             AND bk.${BOOKING_AKTIF}
+        ), 0) < v.daily_capacity`);
       }
 
       conditions.push(`EXISTS (
-        SELECT 1 FROM services s ${join}
+        SELECT 1 FROM services s
         WHERE ${syarat.join(' AND ')}
       )`);
     }
@@ -273,10 +294,21 @@ async function getVendorDetail(req, res, next) {
 async function updateVendor(req, res, next) {
   try {
     const { vendorId } = req.params;
-    const { business_name, city, address, description } = req.body;
+    const { business_name, city, address, description, daily_capacity } = req.body;
 
     if (city && !VALID_CITIES.includes(city)) {
       return res.status(400).json({ message: 'city tidak valid', allowed: VALID_CITIES });
+    }
+
+    // Berapa pesanan yang sanggup dia layani dalam sehari. Untuk MUA dan
+    // fotografer ini jumlah tim; untuk florist dan sewa jas/kebaya jumlah unit
+    // yang bisa keluar per hari. Batas atasnya asal — gunanya cuma menahan
+    // angka ngawur, bukan menyatakan sesuatu tentang bisnisnya.
+    if (daily_capacity !== undefined) {
+      const n = Number(daily_capacity);
+      if (!Number.isInteger(n) || n < 1 || n > 99) {
+        return res.status(400).json({ message: 'daily_capacity harus bilangan bulat 1-99' });
+      }
     }
 
     // Kepemilikan dicek langsung di klausa WHERE, sehingga vendor lain
@@ -287,10 +319,12 @@ async function updateVendor(req, res, next) {
          city          = COALESCE($2, city),
          address       = COALESCE($3, address),
          description   = COALESCE($4, description),
+         daily_capacity = COALESCE($5, daily_capacity),
          updated_at    = now()
-       WHERE vendor_id = $5 AND owner_user_id = $6
+       WHERE vendor_id = $6 AND owner_user_id = $7
        RETURNING *`,
       [business_name || null, city || null, address || null, description || null,
+       daily_capacity === undefined ? null : Number(daily_capacity),
        vendorId, req.user.user_id]
     );
 

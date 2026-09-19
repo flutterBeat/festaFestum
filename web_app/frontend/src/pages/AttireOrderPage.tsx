@@ -40,6 +40,9 @@ export default function AttireOrderPage() {
 
   // Dibawa dari halaman detail.
   const [serviceId, setServiceId] = useState(params.get('service') ?? '')
+  // Jumlah barang yang dipesan. Dikirim sebagai `quantity` dan dipakai backend
+  // untuk mengalikan harga sekaligus memotong kapasitas harian vendor.
+  const [jumlah, setJumlah] = useState(1)
   const [ukuran, setUkuran] = useState(params.get('size') ?? '')
   const [tglSewa, setTglSewa] = useState(params.get('date') ?? '')
   // Dulu shift dipatok 'pagi' diam-diam, jadi penyewaan di tanggal yang slot
@@ -68,7 +71,9 @@ export default function AttireOrderPage() {
   }, [id, params])
 
   const paket = layanan.find((s) => s.service_id === serviceId) ?? layanan[0]
-  const harga = paket ? Number(paket.price) : 0
+  const satuanHarga = paket ? Number(paket.price) : 0
+  // Sewa jas/kebaya memotong stok harian vendor sebanyak jumlah setel ini.
+  const harga = satuanHarga * jumlah
 
   async function ajukan() {
     setGalat('')
@@ -97,6 +102,7 @@ export default function AttireOrderPage() {
         time_slot: shift,
         event_type: jenisAcara,
         event_location_detail: detail,
+        quantity: jumlah,
       })
       navigate(`/checkout/${r.booking.booking_id}`)
     } catch (e) {
@@ -118,6 +124,7 @@ export default function AttireOrderPage() {
             order={{
               vendor: vendor.business_name,
               packageName: paket?.service_name ?? 'Belum ada paket',
+              satuan: jumlah > 1 ? `× ${jumlah}` : undefined,
               price: harga,
               dp: Math.round(harga * 0.3),
               emoji: kat.emoji,
@@ -153,6 +160,11 @@ export default function AttireOrderPage() {
                 <OrderField
                   id="tanggal-ambil" label="TANGGAL  PENGAMBILAN" type="date"
                   value={tglAmbil} onChange={setTglAmbil}
+                />
+                <OrderField
+                  id="jumlah" label="JUMLAH SETEL" type="number" placeholder="1"
+                  value={String(jumlah)}
+                  onChange={(v) => setJumlah(Math.min(999, Math.max(1, Number(v) || 1)))}
                 />
                 <Select
                   id="jenis" label="JENIS ACARA" value={jenisAcara} onChange={setJenisAcara}

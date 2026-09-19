@@ -69,11 +69,8 @@ function ok(label) {
   assert.strictEqual(service.status, 201, `buat service gagal: ${JSON.stringify(service.body)}`);
 
   const eventDate = futureDate();
-  const sch = await api('/schedules', {
-    method: 'POST', token: vendorToken,
-    body: { slots: [{ event_date: eventDate, time_slot: 'pagi' }] },
-  });
-  assert.strictEqual(sch.status, 201, `buat schedule gagal: ${JSON.stringify(sch.body)}`);
+  // Sejak migrasi 013 vendor tersedia secara bawaan — tidak ada slot yang
+  // perlu dibuka lebih dulu.
 
   const customerToken = await register('customer');
   const booking = await api('/bookings', {
@@ -168,11 +165,6 @@ function ok(label) {
 
   for (const [i, [metode, fieldWajib]] of METODE.entries()) {
     const tgl = futureDate(120 + i);
-    await api('/schedules', {
-      method: 'POST', token: vendorToken,
-      body: { slots: [{ event_date: tgl, time_slot: 'pagi' }] },
-    });
-
     const bk = await api('/bookings', {
       method: 'POST', token: customerToken,
       body: {
