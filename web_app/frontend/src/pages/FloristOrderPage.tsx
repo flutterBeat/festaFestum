@@ -44,7 +44,7 @@ export default function FloristOrderPage() {
   // untuk mengalikan harga sekaligus memotong kapasitas harian vendor.
   const [jumlah, setJumlah] = useState(1)
   const [tanggal, setTanggal] = useState(params.get('date') ?? '')
-  const [shift, setShift] = useState(params.get('slot') ?? '')
+  const [jam, setJam] = useState(params.get('jam') ?? '')
   const [jenisAcara, setJenisAcara] = useState(JENIS_ACARA[0].value)
   const [durasi, setDurasi] = useState('')
 
@@ -111,7 +111,7 @@ export default function FloristOrderPage() {
       const r = await buatBooking({
         service_id: paket.service_id,
         event_date: tanggal,
-        time_slot: shift,
+        start_time: jam,
         event_type: jenisAcara,
         event_location_detail: detail,
         quantity: jumlah,
@@ -169,14 +169,16 @@ export default function FloristOrderPage() {
               <p className="block text-[11px] font-semibold tracking-[0.06em] text-ink/70">
                 TANGGAL ACARA
               </p>
-              {/* Kalender menggantikan input tanggal + dropdown shift. */}
+              {/* Kalender + input jam bebas, menggantikan input tanggal polos. */}
               {paket ? (
                 <div className="mt-3">
                   <KalenderSlot
                     serviceId={paket.service_id}
                     tanggal={tanggal}
-                    shift={shift}
-                    onPilih={(t, sh) => { setTanggal(t); setShift(sh) }}
+                    jam={jam}
+                    labelJam="Jam Kirim"
+                    keteranganJam="Jam buket dikirim ke alamat tujuan."
+                    onPilih={(t, j) => { setTanggal(t); setJam(j) }}
                   />
                 </div>
               ) : (

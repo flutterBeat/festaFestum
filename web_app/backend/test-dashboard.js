@@ -71,7 +71,7 @@ const ok = (l) => { pass++; console.log(`  OK  ${l}`); };
     method: 'POST', token: customerToken,
     body: {
       service_id: service.body.service.service_id,
-      event_date: TGL, time_slot: 'pagi',
+      event_date: TGL, start_time: '08:00',
       event_type: 'gala_dinner', event_location_detail: 'Ballroom Uji, Bekasi',
     },
   });
@@ -167,22 +167,22 @@ const ok = (l) => { pass++; console.log(`  OK  ${l}`); };
     token: vendorToken,
   });
   assert.strictEqual(jadwal.status, 200, `jadwal gagal: ${JSON.stringify(jadwal.body)}`);
-  // Grid penuh: 31 hari x 3 shift. Dulu endpoint ini cuma membalas baris yang
-  // ada; sekarang "tidak ada baris" berarti tersedia, jadi kalender vendor
-  // perlu dikirimi seluruh petaknya.
-  assert.strictEqual(jadwal.body.data.length, 31 * 3, 'harusnya grid 31 hari x 3 shift');
+  // Satu baris per TANGGAL sejak migrasi 014 — dulu 31 x 3 karena tiap hari
+  // dipecah jadi tiga shift. Dulu endpoint ini cuma membalas baris yang ada;
+  // sekarang "tidak ada baris" berarti tersedia, jadi kalender vendor perlu
+  // dikirimi seluruh tanggalnya.
+  assert.strictEqual(jadwal.body.data.length, 31, 'harusnya 31 baris, satu per tanggal');
   const dipesan = jadwal.body.data.find((s) => s.booking_id);
-  assert.ok(dipesan, 'slot yang dipesan tidak membawa booking_id');
+  assert.ok(dipesan, 'tanggal yang dipesan tidak membawa booking_id');
   assert.ok(dipesan.customer_name, 'nama customer tidak ikut di kalender');
-  assert.strictEqual(dipesan.status, 'booked', 'slot terpesan harusnya booked');
-  // Vendornya event_organizer berkapasitas 1, jadi SELURUH tanggal itu penuh,
-  // bukan cuma shift yang dipesan. Ini pengganti aturan kunci-seharian lama.
-  const sehari = jadwal.body.data.filter((s) => s.event_date === dipesan.event_date);
-  assert.ok(sehari.every((s) => s.status === 'booked'),
-    'kapasitas 1: semua shift di tanggal itu harusnya penuh');
+  assert.ok(dipesan.start_time, 'jam acara tidak ikut di kalender');
+  // Vendornya event_organizer berkapasitas 1, jadi satu pesanan sudah
+  // menghabiskan tanggalnya.
+  assert.strictEqual(dipesan.status, 'booked', 'tanggal terpesan harusnya booked');
+  assert.strictEqual(dipesan.terpakai, 1, 'terpakai harus melaporkan 1');
   assert.ok(jadwal.body.data.some((s) => s.status === 'available'),
     'tanggal lain harusnya masih tersedia');
-  ok('GET /schedules/me: grid sebulan, tanggal terpesan penuh, sisanya tersedia');
+  ok('GET /schedules/me: sebulan per tanggal, yang terpesan penuh, sisanya tersedia');
 
   const tanpaRentang = await api('/schedules/me', { token: vendorToken });
   assert.strictEqual(tanpaRentang.status, 400, 'rentang tanggal harusnya wajib');

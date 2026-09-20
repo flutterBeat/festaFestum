@@ -96,13 +96,13 @@ export default function VenueOrderPage({ kind }: { kind: keyof typeof variants }
   const [mengirim, setMengirim] = useState(false)
 
   // Dibawa dari halaman detail lewat query. EO tidak punya kalender di
-  // halaman detailnya, jadi tanggal & shift diisi di sini.
+  // halaman detailnya, jadi tanggal & jam diisi di sini.
   const [serviceId, setServiceId] = useState(params.get('service') ?? '')
   const [tanggal, setTanggal] = useState(params.get('date') ?? '')
-  // Tanpa nilai cadangan 'pagi': KalenderSlot yang menentukan shift mana
-  // yang bebas di tanggal terpilih. Kalau halaman ini dibuka dari kartu
-  // vendor dengan ?slot=, nilai itu tetap dipakai sebagai pilihan awal.
-  const [shift, setShift] = useState(params.get('slot') ?? '')
+  // Tanpa nilai bawaan: jam diisi sendiri oleh pemesan. Kalau halaman ini
+  // dibuka dari halaman detail dengan ?jam=, nilai itu dipakai sebagai
+  // isian awal.
+  const [jam, setJam] = useState(params.get('jam') ?? '')
 
   const [jenisAcara, setJenisAcara] = useState(JENIS_ACARA[0].value)
   const [estimasi, setEstimasi] = useState('')
@@ -152,7 +152,7 @@ export default function VenueOrderPage({ kind }: { kind: keyof typeof variants }
       const r = await buatBooking({
         service_id: paket.service_id,
         event_date: tanggal,
-        time_slot: shift,
+        start_time: jam,
         event_type: jenisAcara,
         event_location_detail: detail,
         quantity: jumlah,
@@ -212,7 +212,7 @@ export default function VenueOrderPage({ kind }: { kind: keyof typeof variants }
               <p className="block text-[11px] font-semibold tracking-[0.06em] text-ink/70">
                 TANGGAL ACARA
               </p>
-              {/* Kalender menggantikan input tanggal + dropdown shift: di
+              {/* Kalender + input jam bebas, menggantikan input tanggal polos: di
                   halaman pesan pun tanggal yang tidak bisa dipesan harus mati
                   sejak awal, bukan ditolak setelah tombol ditekan. */}
               {paket ? (
@@ -220,8 +220,8 @@ export default function VenueOrderPage({ kind }: { kind: keyof typeof variants }
                   <KalenderSlot
                     serviceId={paket.service_id}
                     tanggal={tanggal}
-                    shift={shift}
-                    onPilih={(t, sh) => { setTanggal(t); setShift(sh) }}
+                    jam={jam}
+                    onPilih={(t, j) => { setTanggal(t); setJam(j) }}
                   />
                 </div>
               ) : (

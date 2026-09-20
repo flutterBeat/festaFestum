@@ -267,7 +267,7 @@ async function listBookings(req, res, next) {
 
     const { rows } = await pool.query(
       `SELECT bk.booking_id, bk.total_price, bk.payment_status, bk.created_at,
-              bk.event_date, bk.time_slot,
+              bk.event_date, to_char(bk.start_time, 'HH24:MI') AS start_time,
               s.service_name, s.category,
               v.business_name, v.city,
               u.name AS customer_name

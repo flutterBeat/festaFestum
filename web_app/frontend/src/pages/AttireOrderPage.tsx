@@ -45,10 +45,10 @@ export default function AttireOrderPage() {
   const [jumlah, setJumlah] = useState(1)
   const [ukuran, setUkuran] = useState(params.get('size') ?? '')
   const [tglSewa, setTglSewa] = useState(params.get('date') ?? '')
-  // Dulu shift dipatok 'pagi' diam-diam, jadi penyewaan di tanggal yang slot
-  // paginya penuh gagal tanpa user pernah diberi pilihan. Sekarang dipilih
-  // lewat kalender, sama seperti kategori lain.
-  const [shift, setShift] = useState(params.get('slot') ?? '')
+  // Tanpa nilai bawaan. Dulu shift dipatok 'pagi' diam-diam, jadi penyewaan
+  // di tanggal yang slot paginya penuh gagal tanpa penyewa pernah diberi
+  // pilihan; sekarang jamnya diketik sendiri dan tidak mengunci apa pun.
+  const [jam, setJam] = useState(params.get('jam') ?? '')
   const [tglAmbil, setTglAmbil] = useState(params.get('ambil') ?? '')
   const [fitting, setFitting] = useState(params.get('fitting') !== 'false')
   const [tglFitting, setTglFitting] = useState(params.get('tglFitting') ?? '')
@@ -79,7 +79,7 @@ export default function AttireOrderPage() {
     setGalat('')
     if (!paket) return setGalat('Vendor ini belum punya layanan aktif.')
     if (!tglSewa) return setGalat('Tanggal sewa wajib diisi.')
-    if (!shift) return setGalat('Pilih shift dulu.')
+    if (!jam) return setGalat('Pilih jam dulu.')
     if (!ukuran) return setGalat('Ukuran wajib dipilih.')
 
     // Tabel bookings tidak punya kolom ukuran/warna/fitting. Semuanya
@@ -99,7 +99,7 @@ export default function AttireOrderPage() {
       const r = await buatBooking({
         service_id: paket.service_id,
         event_date: tglSewa,
-        time_slot: shift,
+        start_time: jam,
         event_type: jenisAcara,
         event_location_detail: detail,
         quantity: jumlah,
@@ -180,8 +180,10 @@ export default function AttireOrderPage() {
                   <KalenderSlot
                     serviceId={paket.service_id}
                     tanggal={tglSewa}
-                    shift={shift}
-                    onPilih={(t, sh) => { setTglSewa(t); setShift(sh) }}
+                    jam={jam}
+                    labelJam="Jam Pengambilan"
+                    keteranganJam="Jam Anda mengambil setelannya di gerai vendor."
+                    onPilih={(t, j) => { setTglSewa(t); setJam(j) }}
                   />
                 </div>
               ) : (

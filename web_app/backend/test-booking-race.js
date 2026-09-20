@@ -68,7 +68,7 @@ function futureDate(daysAhead = 90) {
 
   const check = await api('/schedules/check', {
     method: 'POST',
-    body: { service_id: serviceId, event_date: eventDate, time_slot: 'pagi' },
+    body: { service_id: serviceId, event_date: eventDate, start_time: '08:00' },
   });
   assert.strictEqual(check.status, 200);
   assert.strictEqual(check.body.available, true, `slot harusnya tersedia: ${check.body.reason}`);
@@ -81,7 +81,7 @@ function futureDate(daysAhead = 90) {
   const results = await Promise.all(tokens.map((t) => api('/bookings', {
     method: 'POST', token: t,
     body: {
-      service_id: serviceId, event_date: eventDate, time_slot: 'pagi',
+      service_id: serviceId, event_date: eventDate, start_time: '08:00',
       event_type: 'wedding', event_location_detail: 'Gedung Uji, Depok',
     },
   })));
@@ -105,7 +105,7 @@ function futureDate(daysAhead = 90) {
   // Setelah dipesan, slot tidak boleh tampil available lagi.
   const after = await api('/schedules/check', {
     method: 'POST',
-    body: { service_id: serviceId, event_date: eventDate, time_slot: 'pagi' },
+    body: { service_id: serviceId, event_date: eventDate, start_time: '08:00' },
   });
   assert.strictEqual(after.body.available, false, 'slot harusnya tidak available setelah dibooking');
 

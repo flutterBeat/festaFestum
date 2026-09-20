@@ -11,7 +11,6 @@ const VALID_CATEGORIES = [
   'event_organizer', 'florist', 'attire_rental', 'makeup_artist', 'photographer',
 ];
 
-const VALID_SLOTS = ['pagi', 'siang', 'malam'];
 
 function isValidDate(s) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
@@ -63,7 +62,7 @@ async function createVendor(req, res, next) {
 async function listVendors(req, res, next) {
   try {
     const {
-      city, category, min_rating, event_date, time_slot,
+      city, category, min_rating, event_date,
     } = req.query;
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50);
@@ -87,19 +86,11 @@ async function listVendors(req, res, next) {
       return res.status(400).json({ message: 'category tidak valid', allowed: VALID_CATEGORIES });
     }
 
-    // Schedule-first discovery: tanggal + shift dipakai bersama, tidak sendiri.
-    // Sendirian keduanya tidak punya arti — "tersedia tanggal 20" tanpa shift
-    // tidak bisa dijawab, karena ketersediaan disimpan per shift.
-    if ((event_date && !time_slot) || (!event_date && time_slot)) {
-      return res.status(400).json({
-        message: 'event_date dan time_slot harus diisi berdua',
-      });
-    }
+    // Schedule-first discovery. Sejak migrasi 014 cukup TANGGAL: shift sudah
+    // tidak ada, dan jam acara tidak menentukan ketersediaan apa pun — yang
+    // habis kapasitas harian vendornya.
     if (event_date && !isValidDate(event_date)) {
       return res.status(400).json({ message: 'event_date harus format YYYY-MM-DD' });
-    }
-    if (time_slot && !VALID_SLOTS.includes(time_slot)) {
-      return res.status(400).json({ message: 'time_slot tidak valid', allowed: VALID_SLOTS });
     }
 
     // Kategori dan ketersediaan digabung dalam SATU EXISTS, bukan dua kondisi
@@ -118,8 +109,6 @@ async function listVendors(req, res, next) {
       if (event_date) {
         values.push(event_date);
         const pDate = values.length;
-        values.push(time_slot);
-        const pSlot = values.length;
 
         // Lead time per layanan, aturan yang sama dengan POST /schedules/check.
         syarat.push(`$${pDate}::date >= CURRENT_DATE + s.minimum_notice_days`);
@@ -128,22 +117,15 @@ async function listVendors(req, res, next) {
         // ada JOIN ke vendor_schedules yang menuntut baris 'available' — itu
         // sebabnya vendor tanpa slot terbuka hilang dari pencarian, dan seed
         // harus mengarang 30 hari ketersediaan supaya vendor kelihatan hidup.
-        // Tiga syarat ini sama persis dengan yang dibaca createBooking.
+        // Dua syarat ini sama persis dengan yang dibaca createBooking; yang
+        // ketiga (shift sudah terisi) hilang bersama shift di migrasi 014.
         syarat.push(`NOT EXISTS (
           SELECT 1 FROM vendor_schedules vs
            WHERE vs.vendor_id = v.vendor_id
              AND vs.event_date = $${pDate}::date
-             AND vs.time_slot = $${pSlot}::time_slot
-        )`);
-        syarat.push(`NOT EXISTS (
-          SELECT 1 FROM bookings bk
-           WHERE bk.vendor_id = v.vendor_id
-             AND bk.event_date = $${pDate}::date
-             AND bk.time_slot = $${pSlot}::time_slot
-             AND bk.kunci_shift AND bk.${BOOKING_AKTIF}
         )`);
         syarat.push(`COALESCE((
-          SELECT SUM(CASE WHEN bk.kunci_shift THEN 1 ELSE bk.quantity END)
+          SELECT SUM(CASE WHEN bk.per_tim THEN 1 ELSE bk.quantity END)
             FROM bookings bk
            WHERE bk.vendor_id = v.vendor_id
              AND bk.event_date = $${pDate}::date

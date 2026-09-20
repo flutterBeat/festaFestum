@@ -1,9 +1,8 @@
 const pool = require('../config/db');
 const { hitungSaldo, vendorIdMilik } = require('../lib/saldo');
 const { acquireLock, lockHolder, releaseLock } = require('../config/redis');
-const { kunciShift, BOOKING_AKTIF } = require('../lib/kategori');
+const { perTim: kategoriPerTim, BOOKING_AKTIF } = require('../lib/kategori');
 
-const VALID_SLOTS = ['pagi', 'siang', 'malam'];
 const VALID_EVENT_TYPES = [
   'wedding', 'engagement', 'graduation', 'gala_dinner', 'corporate_seminar',
 ];
@@ -19,7 +18,7 @@ function isValidDate(s) {
 }
 
 // POST /api/v1/bookings  (login)
-// Body: { service_id, event_date, time_slot, event_type, event_location_detail,
+// Body: { service_id, event_date, start_time, event_type, event_location_detail,
 //         quantity? }
 //
 // Tiga lapis pertahanan terhadap double-booking, dari luar ke dalam:
@@ -29,22 +28,28 @@ function isValidDate(s) {
 //      vendor itu di tanggal itu, jadi hitungan kapasitas tidak bisa balapan.
 //      Menggantikan SELECT ... FOR UPDATE yang dulu mengunci baris jadwal:
 //      barisnya sekarang tidak ada sampai vendor menutup tanggalnya.
-//   3. idx_booking_shift_aktif — jaring terakhir di level DB kalau 1 & 2 bocor
+//   3. idx_booking_slot_ke_aktif — jaring terakhir di level DB kalau 1 & 2 bocor.
+//      Indeks unik cuma bisa menjamin "paling banyak satu", jadi tiap pesanan
+//      per_tim memegang NOMOR slot (0..kapasitas-1) dan indeksnya menjamin
+//      tidak ada dua pesanan memegang nomor yang sama. Lihat migrasi 014.
 async function createBooking(req, res, next) {
   const {
-    service_id, event_date, time_slot, event_type, event_location_detail, quantity,
+    service_id, event_date, start_time, event_type, event_location_detail, quantity,
   } = req.body;
 
-  if (!service_id || !event_date || !time_slot || !event_type || !event_location_detail) {
+  if (!service_id || !event_date || !start_time || !event_type || !event_location_detail) {
     return res.status(400).json({
-      message: 'service_id, event_date, time_slot, event_type, dan event_location_detail wajib diisi',
+      message: 'service_id, event_date, start_time, event_type, dan event_location_detail wajib diisi',
     });
   }
   if (!isValidDate(event_date)) {
     return res.status(400).json({ message: 'event_date harus format YYYY-MM-DD' });
   }
-  if (!VALID_SLOTS.includes(time_slot)) {
-    return res.status(400).json({ message: 'time_slot tidak valid', allowed: VALID_SLOTS });
+  // Jam acara/kirim. HH:MM 24 jam — bentuk yang dikirim <input type="time">.
+  // Menit bebas, bukan kelipatan tertentu: kelima mockup "Isi data diri"
+  // memakai input jam biasa, bukan daftar pilihan.
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start_time)) {
+    return res.status(400).json({ message: 'start_time harus format HH:MM (24 jam)' });
   }
   if (!VALID_EVENT_TYPES.includes(event_type)) {
     return res.status(400).json({ message: 'event_type tidak valid', allowed: VALID_EVENT_TYPES });
@@ -81,8 +86,11 @@ async function createBooking(req, res, next) {
       vendor_id, price, minimum_notice_days, category, daily_capacity, notice_ok,
     } = svc.rows[0];
     // Satu pesanan = satu tim (MUA/EO/fotografer) atau sekian unit stok
-    // (florist/sewa). Yang pertama juga mengunci shiftnya.
-    const perTim = kunciShift(category);
+    // (florist/sewa). Yang pertama memotong kapasitas 1 berapa pun jumlahnya.
+    const perTim = kategoriPerTim(category);
+    // Tanggalnya habis begitu ada satu pesanan: cuma vendor per_tim yang
+    // kapasitasnya 1. Yang menentukan perlu-tidaknya lock Redis.
+    const eksklusif = perTim && daily_capacity === 1;
     vendorId = vendor_id;
 
     if (!notice_ok) {
@@ -91,20 +99,22 @@ async function createBooking(req, res, next) {
       });
     }
 
-    // Lock Redis cuma masuk akal kalau shiftnya memang eksklusif. Florist
-    // berkapasitas 10 tidak boleh dipaksa antre satu-satu di checkout hanya
-    // karena kebetulan memilih jam kirim yang sama.
-    if (perTim) {
-      // Kalau user sudah hold slot ini lewat /schedules/hold, lock-nya sudah
-      // atas namanya — jangan direbut ulang, cukup dipakai lalu dilepas di akhir.
-      const holder = await lockHolder(vendor_id, event_date, time_slot);
+    // Lock Redis cuma masuk akal kalau tanggalnya memang eksklusif: dihitung
+    // per tim DAN kapasitasnya cuma satu. Florist berkapasitas 10 — dan MUA
+    // berkru 3 — tidak boleh dipaksa antre satu-satu di checkout, karena
+    // tanggalnya memang muat lebih dari satu pesanan.
+    if (eksklusif) {
+      // Kalau user sudah hold tanggal ini lewat /schedules/hold, lock-nya
+      // sudah atas namanya — jangan direbut ulang, cukup dipakai lalu
+      // dilepas di akhir.
+      const holder = await lockHolder(vendor_id, event_date);
       if (holder && holder !== userId) {
-        return res.status(409).json({ message: 'Slot sedang diproses user lain' });
+        return res.status(409).json({ message: 'Tanggal sedang diproses user lain' });
       }
       if (!holder) {
-        const got = await acquireLock(vendor_id, event_date, time_slot, userId);
+        const got = await acquireLock(vendor_id, event_date, userId);
         if (!got) {
-          return res.status(409).json({ message: 'Slot sedang diproses user lain' });
+          return res.status(409).json({ message: 'Tanggal sedang diproses user lain' });
         }
       }
       weOwnTheLock = true;
@@ -112,11 +122,9 @@ async function createBooking(req, res, next) {
 
     await client.query('BEGIN');
 
-    // Semua pemesanan vendor ini di tanggal ini diserialkan di sini. Satu
-    // kunci untuk SELURUH tanggal, bukan per shift: kapasitas harian dihitung
-    // lintas shift, jadi dua pesanan di shift berbeda tetap harus antre.
-    // Ini juga menghapus tarian ORDER BY time_slot yang dulu perlu supaya dua
-    // pesanan di shift berbeda tidak saling mengunci.
+    // Semua pemesanan vendor ini di tanggal ini diserialkan di sini. Inilah
+    // yang membuat hitungan kapasitas — dan pemilihan nomor slot di bawah —
+    // tidak bisa balapan.
     await client.query(
       'SELECT pg_advisory_xact_lock(hashtext($1))',
       [`${vendor_id}:${event_date}`]
@@ -126,19 +134,19 @@ async function createBooking(req, res, next) {
     // Tidak ada baris = tersedia.
     const tutup = await client.query(
       `SELECT 1 FROM vendor_schedules
-        WHERE vendor_id = $1 AND event_date = $2::date AND time_slot = $3::time_slot`,
-      [vendor_id, event_date, time_slot]
+        WHERE vendor_id = $1 AND event_date = $2::date`,
+      [vendor_id, event_date]
     );
     if (tutup.rows.length > 0) {
       await client.query('ROLLBACK');
       return res.status(409).json({ message: 'Vendor tidak menerima pesanan di tanggal ini' });
     }
 
-    // kunci_shift dibaca dari BARIS PESANANNYA, bukan dari kategori layanan
+    // per_tim dibaca dari BARIS PESANANNYA, bukan dari kategori layanan
     // yang sedang dipesan: satu vendor satu kategori, jadi seluruh pesanannya
     // dihitung dengan aturan yang sama, termasuk pesanan lama.
     const pakai = await client.query(
-      `SELECT COALESCE(SUM(CASE WHEN kunci_shift THEN 1 ELSE quantity END), 0)::int AS terpakai
+      `SELECT COALESCE(SUM(CASE WHEN per_tim THEN 1 ELSE quantity END), 0)::int AS terpakai
          FROM bookings
         WHERE vendor_id = $1 AND event_date = $2::date AND ${BOOKING_AKTIF}`,
       [vendor_id, event_date]
@@ -156,17 +164,33 @@ async function createBooking(req, res, next) {
       });
     }
 
+    // Nomor slot untuk pesanan per_tim: angka bebas TERKECIL di
+    // [0, daily_capacity). Dipilih di dalam advisory lock, jadi dua pemesan
+    // tidak bisa mendapat angka yang sama; kalaupun lock-nya bocor,
+    // idx_booking_slot_ke_aktif menolak yang kedua di level DB.
+    //
+    // Pesanan yang tidak per_tim tidak bernomor (NULL) — kapasitasnya dipotong
+    // per unit, dan beberapa pesanan memang boleh berbagi hari yang sama.
+    let slotKe = null;
     if (perTim) {
-      const shift = await client.query(
-        `SELECT 1 FROM bookings
-          WHERE vendor_id = $1 AND event_date = $2::date AND time_slot = $3::time_slot
-            AND kunci_shift AND ${BOOKING_AKTIF}`,
-        [vendor_id, event_date, time_slot]
+      const bebas = await client.query(
+        `SELECT n FROM generate_series(0, $3::int - 1) n
+          WHERE NOT EXISTS (
+            SELECT 1 FROM bookings
+             WHERE vendor_id = $1 AND event_date = $2::date
+               AND slot_ke = n AND per_tim AND ${BOOKING_AKTIF}
+          )
+          ORDER BY n LIMIT 1`,
+        [vendor_id, event_date, daily_capacity]
       );
-      if (shift.rows.length > 0) {
+      // Tidak mungkin kosong: hitungan kapasitas di atas sudah lolos. Kalau
+      // toh kosong, itu berarti kedua hitungan tidak sepakat — tolak, jangan
+      // menyimpan pesanan tanpa nomor.
+      if (bebas.rows.length === 0) {
         await client.query('ROLLBACK');
-        return res.status(409).json({ message: 'Slot tidak tersedia' });
+        return res.status(409).json({ message: 'Vendor sudah penuh di tanggal tersebut' });
       }
+      slotKe = bebas.rows[0].n;
     }
 
     // Nominal selalu dihitung ulang di sini dari harga layanan di DB — angka
@@ -176,14 +200,14 @@ async function createBooking(req, res, next) {
 
     const booking = await client.query(
       `INSERT INTO bookings
-         (user_id, service_id, vendor_id, event_date, time_slot, kunci_shift,
-          quantity, event_type, event_location_detail, total_price, dp_amount,
-          soft_lock_expires_at)
-       VALUES ($1, $2, $3, $4::date, $5::time_slot, $6, $7, $8, $9, $10, $11,
+         (user_id, service_id, vendor_id, event_date, start_time, per_tim,
+          slot_ke, quantity, event_type, event_location_detail, total_price,
+          dp_amount, soft_lock_expires_at)
+       VALUES ($1, $2, $3, $4::date, $5::time, $6, $7, $8, $9, $10, $11, $12,
                now() + interval '24 hours')
        RETURNING *`,
-      [userId, service_id, vendor_id, event_date, time_slot, perTim,
-       jumlah, event_type, event_location_detail, totalPrice, dpAmount]
+      [userId, service_id, vendor_id, event_date, start_time, perTim,
+       slotKe, jumlah, event_type, event_location_detail, totalPrice, dpAmount]
     );
 
     await client.query('COMMIT');
@@ -196,7 +220,7 @@ async function createBooking(req, res, next) {
     client.release();
     // Lock dilepas apa pun hasilnya: kalau booking sukses, DB (status 'held')
     // yang jadi penjaga; kalau gagal, slot harus segera bebas untuk user lain.
-    if (weOwnTheLock) await releaseLock(vendorId, event_date, time_slot, userId);
+    if (weOwnTheLock) await releaseLock(vendorId, event_date, userId);
   }
 }
 
@@ -244,7 +268,7 @@ const BOOKING_SELECT = `
          s.service_id, s.service_name, s.category,
          v.vendor_id, v.business_name, v.city,
          u.name AS customer_name, u.phone AS customer_phone,
-         b.event_date, b.time_slot, b.quantity,
+         b.event_date, to_char(b.start_time, 'HH24:MI') AS start_time, b.quantity,
          COALESCE(
            (SELECT json_agg(json_build_object(
                      'payment_id', p.payment_id,

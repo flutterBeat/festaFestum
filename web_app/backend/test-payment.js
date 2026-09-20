@@ -77,7 +77,7 @@ function ok(label) {
     method: 'POST', token: customerToken,
     body: {
       service_id: service.body.service.service_id,
-      event_date: eventDate, time_slot: 'pagi',
+      event_date: eventDate, start_time: '08:00',
       event_type: 'wedding', event_location_detail: 'Gedung Uji, Depok',
     },
   });
@@ -169,7 +169,7 @@ function ok(label) {
       method: 'POST', token: customerToken,
       body: {
         service_id: service.body.service.service_id,
-        event_date: tgl, time_slot: 'pagi',
+        event_date: tgl, start_time: '08:00',
         event_type: 'wedding', event_location_detail: 'Gedung Uji, Depok',
       },
     });
@@ -258,7 +258,7 @@ function ok(label) {
     method: 'POST',
     body: {
       service_id: service.body.service.service_id,
-      event_date: eventDate, time_slot: 'pagi',
+      event_date: eventDate, start_time: '08:00',
     },
   });
   assert.strictEqual(cekSlot.body.available, false, 'slot harusnya sudah terkunci setelah DP');

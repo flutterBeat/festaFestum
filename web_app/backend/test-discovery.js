@@ -76,6 +76,10 @@ async function muncul(query) {
   );
 
   const TGL = futureDate(20);
+  // Tanggal kedua khusus untuk uji penutupan. Sejak migrasi 014 penutupan
+  // berlaku SEHARI PENUH — kalau dipakai TGL yang sama, semua pemeriksaan
+  // sesudahnya ikut kena dan yang diuji jadi bukan lagi filter kategori.
+  const TGL_TUTUP = futureDate(21);
   // Tidak ada slot yang perlu dibuka: sejak migrasi 013 vendor tersedia
   // secara bawaan, dan POST /schedules justru MENUTUP tanggal.
 
@@ -85,35 +89,34 @@ async function muncul(query) {
   ok('muncul di filter kategori florist');
 
   assert.ok(
-    await muncul(`category=florist&event_date=${TGL}&time_slot=pagi`),
+    await muncul(`category=florist&event_date=${TGL}`),
     'harusnya muncul: slot tersedia dan lead time terpenuhi'
   );
   ok('muncul saat tanggal tersedia + lead time terpenuhi');
 
   assert.ok(
-    !(await muncul(`category=florist&event_date=${futureDate(3)}&time_slot=pagi`)),
+    !(await muncul(`category=florist&event_date=${futureDate(3)}`)),
     'harusnya TIDAK muncul: minimum_notice_days 7 hari belum terpenuhi'
   );
   ok('hilang saat tanggal terlalu mepet (minimum_notice_days ditegakkan)');
 
-  // Kebalikan dari sebelumnya: shift yang tidak disebut apa-apa sekarang
-  // TERSEDIA. Yang membuat vendor hilang adalah penutupan yang dia buat
-  // sendiri, jadi itu yang diuji.
+  // Tanggal yang tidak disebut apa-apa = TERSEDIA. Yang membuat vendor
+  // hilang adalah penutupan yang dia buat sendiri, jadi itu yang diuji.
   assert.ok(
-    await muncul(`category=florist&event_date=${TGL}&time_slot=malam`),
-    'harusnya muncul: shift malam tidak ditutup siapa pun'
+    await muncul(`category=florist&event_date=${TGL_TUTUP}`),
+    'harusnya muncul: tanggal itu tidak ditutup siapa pun'
   );
-  ok('muncul di shift yang tidak ditutup');
+  ok('muncul di tanggal yang tidak ditutup');
 
-  await api('/schedules', {
-    method: 'POST', token,
-    body: { slots: [{ event_date: TGL, time_slot: 'malam' }] },
+  const tutup = await api('/schedules', {
+    method: 'POST', token, body: { dates: [TGL_TUTUP] },
   });
+  assert.strictEqual(tutup.status, 201, `tutup tanggal gagal: ${JSON.stringify(tutup.body)}`);
   assert.ok(
-    !(await muncul(`category=florist&event_date=${TGL}&time_slot=malam`)),
-    'harusnya TIDAK muncul: shift malam sudah ditutup vendor'
+    !(await muncul(`category=florist&event_date=${TGL_TUTUP}`)),
+    'harusnya TIDAK muncul: tanggal sudah ditutup vendor'
   );
-  ok('hilang saat vendor menutup shift itu');
+  ok('hilang saat vendor menutup tanggal itu');
 
   // --- Inti pengujian ----------------------------------------------------
   // Layanan florist dinonaktifkan, layanan photographer TETAP aktif dan
@@ -126,13 +129,13 @@ async function muncul(query) {
   );
 
   assert.ok(
-    !(await muncul(`category=florist&event_date=${TGL}&time_slot=pagi`)),
+    !(await muncul(`category=florist&event_date=${TGL}`)),
     'BUG: masih muncul di florist padahal layanan florist-nya nonaktif'
   );
   ok('tidak bocor ke kategori florist saat layanan florist nonaktif');
 
   assert.ok(
-    await muncul(`category=photographer&event_date=${TGL}&time_slot=pagi`),
+    await muncul(`category=photographer&event_date=${TGL}`),
     'harusnya masih muncul di photographer'
   );
   ok('masih muncul di photographer, slot yang sama');

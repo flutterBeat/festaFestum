@@ -297,7 +297,7 @@ async function getPayment(req, res, next) {
               b.event_location_detail,
               s.service_name, s.category,
               v.business_name, v.city,
-              b.event_date, b.time_slot
+              b.event_date, to_char(b.start_time, 'HH24:MI') AS start_time
          FROM payments p
          JOIN bookings b ON b.booking_id = p.booking_id
          JOIN services s ON s.service_id = b.service_id

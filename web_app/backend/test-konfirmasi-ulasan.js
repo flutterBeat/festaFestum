@@ -78,7 +78,7 @@ function tanggal(n) {
   const pesan = () => api('/bookings', {
     method: 'POST', token: customer.token,
     body: {
-      service_id: serviceId, event_date: hariH, time_slot: 'pagi',
+      service_id: serviceId, event_date: hariH, start_time: '08:00',
       event_type: 'wedding', event_location_detail: 'Uji lokasi',
     },
   });

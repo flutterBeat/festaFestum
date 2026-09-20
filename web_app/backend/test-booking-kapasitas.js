@@ -8,6 +8,8 @@
 //   5. Tanggal yang ditutup vendor ditolak
 //   6. Vendor tidak bisa menutup tanggal yang sudah dipesan
 //   7. Lima orang berebut kapasitas 3: tepat 3 yang berhasil
+//   8. Jam acara TIDAK mengunci apa pun (migrasi 014) — dua pesanan boleh
+//      berbagi jam yang sama selama kapasitasnya masih sisa
 //
 // Jalankan dengan server hidup:  node test-booking-kapasitas.js
 const assert = require('assert');
@@ -78,11 +80,11 @@ async function siapkanVendor(category, kapasitas) {
   return { token, vendorId, serviceId: s.body.service.service_id };
 }
 
-function pesan(token, serviceId, event_date, time_slot, quantity) {
+function pesan(token, serviceId, event_date, start_time, quantity) {
   return api('/bookings', {
     method: 'POST', token,
     body: {
-      service_id: serviceId, event_date, time_slot,
+      service_id: serviceId, event_date, start_time,
       event_type: 'wedding', event_location_detail: 'Gedung Uji',
       ...(quantity ? { quantity } : {}),
     },
@@ -99,16 +101,17 @@ function pesan(token, serviceId, event_date, time_slot, quantity) {
     const v = await siapkanVendor('photographer');
     const c = await register('customer');
 
-    const a = await pesan(c, v.serviceId, TGL_A, 'pagi');
+    const a = await pesan(c, v.serviceId, TGL_A, '08:00');
     assert.strictEqual(a.status, 201, `pesanan pertama gagal: ${JSON.stringify(a.body)}`);
-    ok('pesanan pertama diterima');
+    assert.strictEqual(a.body.booking.slot_ke, 0, 'pesanan pertama harus memegang slot nomor 0');
+    ok('pesanan pertama diterima, memegang slot 0');
 
-    const b = await pesan(await register('customer'), v.serviceId, TGL_A, 'malam');
-    assert.strictEqual(b.status, 409, 'shift lain di tanggal yang sama harusnya ditolak');
+    const b = await pesan(await register('customer'), v.serviceId, TGL_A, '19:00');
+    assert.strictEqual(b.status, 409, 'jam lain di tanggal yang sama harusnya ditolak');
     assert.ok(/penuh/i.test(b.body.message), `pesan salah: ${b.body.message}`);
-    ok('shift LAIN di tanggal itu ikut tertutup (pengganti kunci-seharian)');
+    ok('jam LAIN di tanggal itu ikut tertutup: yang habis kapasitas, bukan jam');
 
-    const lain = await pesan(await register('customer'), v.serviceId, TGL_B, 'pagi');
+    const lain = await pesan(await register('customer'), v.serviceId, TGL_B, '08:00');
     assert.strictEqual(lain.status, 201, 'tanggal lain harusnya masih bisa');
     ok('tanggal lain tidak ikut terkunci');
 
@@ -116,8 +119,8 @@ function pesan(token, serviceId, event_date, time_slot, quantity) {
     const kal = await api(`/services/${v.serviceId}/availability?from=${TGL_A}&to=${TGL_A}`);
     assert.strictEqual(kal.status, 200);
     assert.ok(kal.body.data.every((s) => s.status !== 'available'),
-      'kalender masih menawarkan slot di tanggal yang sudah penuh');
-    ok('kalender ikut menutup seluruh tanggal itu');
+      'kalender masih menawarkan tanggal yang sudah penuh');
+    ok('kalender ikut menutup tanggal itu');
   }
 
   // --- 2 & 3. Kapasitas > 1, dan jumlah orang tidak memotong kapasitas ---
@@ -126,27 +129,39 @@ function pesan(token, serviceId, event_date, time_slot, quantity) {
     const v = await siapkanVendor('makeup_artist', 2);
 
     // Lima orang dalam satu pesanan tetap satu tim.
-    const a = await pesan(await register('customer'), v.serviceId, TGL_A, 'pagi', 5);
+    const a = await pesan(await register('customer'), v.serviceId, TGL_A, '08:00', 5);
     assert.strictEqual(a.status, 201, `pesanan 5 orang gagal: ${JSON.stringify(a.body)}`);
     assert.strictEqual(Number(a.body.booking.total_price), 5000000, 'harga harus dikali jumlah orang');
     assert.strictEqual(Number(a.body.booking.dp_amount), 1500000, 'DP harus ikut jumlah orang');
     ok('pesanan 5 orang: harga dikali 5, kapasitas terpotong 1');
 
-    const b = await pesan(await register('customer'), v.serviceId, TGL_A, 'siang');
+    const b = await pesan(await register('customer'), v.serviceId, TGL_A, '13:00');
     assert.strictEqual(b.status, 201, 'tim kedua harusnya masih bisa dipesan');
+    assert.strictEqual(b.body.booking.slot_ke, 1, 'tim kedua harus memegang slot nomor 1');
     ok('tim kedua di tanggal yang sama tetap menerima pesanan');
 
-    const c = await pesan(await register('customer'), v.serviceId, TGL_A, 'malam');
+    const c = await pesan(await register('customer'), v.serviceId, TGL_A, '19:00');
     assert.strictEqual(c.status, 409, 'pesanan ketiga harusnya melebihi kapasitas');
     ok('pesanan ketiga ditolak: kapasitas 2 habis');
 
-    // Shift yang sama tidak boleh diambil dua kali walau kapasitas tersisa.
+    // --- 8. Jam yang SAMA boleh dipakai dua pesanan ---------------------
+    // Kebalikan dari aturan sebelum migrasi 014. Dulu shift yang sama ditolak
+    // walau kapasitas masih sisa — MUA berkru 3 tidak bisa menerima dua
+    // pesanan sekaligus, padahal ketiga krunya bisa di tiga tempat.
     const v2 = await siapkanVendor('makeup_artist', 3);
-    const p1 = await pesan(await register('customer'), v2.serviceId, TGL_B, 'pagi');
+    const p1 = await pesan(await register('customer'), v2.serviceId, TGL_B, '09:00');
     assert.strictEqual(p1.status, 201);
-    const p2 = await pesan(await register('customer'), v2.serviceId, TGL_B, 'pagi');
-    assert.strictEqual(p2.status, 409, 'shift yang sama harusnya tetap eksklusif');
-    ok('shift yang sama tetap satu pesanan walau kapasitas masih sisa');
+    const p2 = await pesan(await register('customer'), v2.serviceId, TGL_B, '09:00');
+    assert.strictEqual(p2.status, 201, 'jam yang sama harusnya boleh selama kapasitas sisa');
+    assert.notStrictEqual(p2.body.booking.slot_ke, p1.body.booking.slot_ke,
+      'dua pesanan tidak boleh memegang nomor slot yang sama');
+    ok('jam yang sama diterima dua kali, nomor slotnya berbeda');
+
+    const p3 = await pesan(await register('customer'), v2.serviceId, TGL_B, '09:00');
+    assert.strictEqual(p3.status, 201, 'kru ketiga harusnya masih muat');
+    const p4 = await pesan(await register('customer'), v2.serviceId, TGL_B, '09:00');
+    assert.strictEqual(p4.status, 409, 'kru keempat tidak ada');
+    ok('berhenti tepat di kapasitas 3, bukan di jumlah jam');
   }
 
   // --- 4. Florist: kapasitas dipotong sejumlah barang -------------------
@@ -154,16 +169,17 @@ function pesan(token, serviceId, event_date, time_slot, quantity) {
   {
     const v = await siapkanVendor('florist', 5);
 
-    const a = await pesan(await register('customer'), v.serviceId, TGL_A, 'pagi', 3);
+    const a = await pesan(await register('customer'), v.serviceId, TGL_A, '08:00', 3);
     assert.strictEqual(a.status, 201, `pesan 3 buket gagal: ${JSON.stringify(a.body)}`);
+    assert.strictEqual(a.body.booking.slot_ke, null, 'pesanan non per-tim tidak bernomor slot');
     ok('3 buket diterima');
 
-    // Shift yang SAMA, dan itu memang boleh: florist tidak mengunci shift.
-    const b = await pesan(await register('customer'), v.serviceId, TGL_A, 'pagi', 2);
-    assert.strictEqual(b.status, 201, 'shift yang sama harusnya boleh untuk florist');
-    ok('pesanan kedua di shift yang sama diterima (stok, bukan waktu)');
+    // Jam kirim yang SAMA, dan itu memang boleh: yang habis stok, bukan waktu.
+    const b = await pesan(await register('customer'), v.serviceId, TGL_A, '08:00', 2);
+    assert.strictEqual(b.status, 201, 'jam kirim yang sama harusnya boleh untuk florist');
+    ok('pesanan kedua di jam kirim yang sama diterima (stok, bukan waktu)');
 
-    const c = await pesan(await register('customer'), v.serviceId, TGL_A, 'siang', 1);
+    const c = await pesan(await register('customer'), v.serviceId, TGL_A, '13:00', 1);
     assert.strictEqual(c.status, 409, 'stok harusnya habis');
     assert.strictEqual(c.body.sisa_kapasitas, 0, 'sisa kapasitas harus dilaporkan');
     ok('pesanan ketiga ditolak: 3 + 2 = 5 stok habis');
@@ -174,36 +190,36 @@ function pesan(token, serviceId, event_date, time_slot, quantity) {
   {
     const v = await siapkanVendor('florist', 5);
     const tutup = await api('/schedules', {
-      method: 'POST', token: v.token,
-      body: { slots: [{ event_date: TGL_A, time_slot: 'pagi' }] },
+      method: 'POST', token: v.token, body: { dates: [TGL_A] },
     });
     assert.strictEqual(tutup.status, 201, `tutup gagal: ${JSON.stringify(tutup.body)}`);
     assert.strictEqual(tutup.body.ditutup, 1);
 
-    const a = await pesan(await register('customer'), v.serviceId, TGL_A, 'pagi');
+    const a = await pesan(await register('customer'), v.serviceId, TGL_A, '08:00');
     assert.strictEqual(a.status, 409, 'tanggal yang ditutup harusnya ditolak');
-    ok('pesanan di shift yang ditutup ditolak');
+    ok('pesanan di tanggal yang ditutup ditolak');
 
-    const b = await pesan(await register('customer'), v.serviceId, TGL_A, 'siang');
-    assert.strictEqual(b.status, 201, 'shift lain harusnya masih terbuka');
-    ok('shift lain di tanggal itu tidak ikut tertutup');
-
-    // Menutup shift yang sudah dipesan akan membuat kalender berbohong.
-    const bentrok = await api('/schedules', {
-      method: 'POST', token: v.token,
-      body: { slots: [{ event_date: TGL_A, time_slot: 'siang' }] },
-    });
-    assert.strictEqual(bentrok.status, 409, 'menutup slot terpesan harusnya ditolak');
-    assert.ok(bentrok.body.bentrok.length > 0, 'slot bentroknya harus disebutkan');
-    ok('vendor tidak bisa menutup shift yang sudah dipesan');
+    // Penutupan sekarang SEHARI PENUH: jam lain pun ikut tertutup. Sebelum
+    // migrasi 014 ini masih terbuka, karena yang ditutup cuma satu shift.
+    const b = await pesan(await register('customer'), v.serviceId, TGL_A, '13:00');
+    assert.strictEqual(b.status, 409, 'jam lain di tanggal tertutup harusnya ikut ditolak');
+    ok('penutupan berlaku sehari penuh, bukan sepotong hari');
 
     const buka = await api(`/schedules/${tutup.body.schedules[0].schedule_id}`, {
       method: 'DELETE', token: v.token,
     });
     assert.strictEqual(buka.status, 200, 'membuka kembali harusnya berhasil');
-    const c = await pesan(await register('customer'), v.serviceId, TGL_A, 'pagi');
+    const c = await pesan(await register('customer'), v.serviceId, TGL_A, '08:00');
     assert.strictEqual(c.status, 201, 'sesudah dibuka harusnya bisa dipesan lagi');
     ok('penutupan dicabut, tanggalnya bisa dipesan lagi');
+
+    // Menutup tanggal yang sudah dipesan akan membuat kalender berbohong.
+    const bentrok = await api('/schedules', {
+      method: 'POST', token: v.token, body: { dates: [TGL_A] },
+    });
+    assert.strictEqual(bentrok.status, 409, 'menutup tanggal terpesan harusnya ditolak');
+    assert.ok(bentrok.body.bentrok.length > 0, 'tanggal bentroknya harus disebutkan');
+    ok('vendor tidak bisa menutup tanggal yang sudah dipesan');
   }
 
   // --- 7. Balapan memperebutkan kapasitas -------------------------------
@@ -214,7 +230,7 @@ function pesan(token, serviceId, event_date, time_slot, quantity) {
     for (let i = 0; i < 5; i++) tokens.push(await register('customer'));
 
     const hasil = await Promise.all(
-      tokens.map((t) => pesan(t, v.serviceId, TGL_B, 'pagi', 1))
+      tokens.map((t) => pesan(t, v.serviceId, TGL_B, '08:00', 1))
     );
     const sukses = hasil.filter((r) => r.status === 201).length;
     const tolak = hasil.filter((r) => r.status === 409).length;
