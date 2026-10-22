@@ -53,6 +53,8 @@ async function muncul(query) {
     method: 'POST', token,
     body: { business_name: TAG, city: 'depok' },
   });
+  // Vendor baru belum diverifikasi admin, dan yang belum tidak tampil ke publik.
+  await pool.query('UPDATE vendors SET is_verified = TRUE WHERE vendor_id = $1', [vendor.body.vendor.vendor_id]);
   assert.strictEqual(vendor.status, 201);
   const vendorId = vendor.body.vendor.vendor_id;
 
@@ -87,6 +89,15 @@ async function muncul(query) {
 
   assert.ok(await muncul('category=florist'), 'harusnya muncul di florist');
   ok('muncul di filter kategori florist');
+
+  // Vendor yang belum (atau tidak lagi) terverifikasi hilang dari semua pintu publik.
+  await pool.query('UPDATE vendors SET is_verified = FALSE WHERE vendor_id = $1', [vendorId]);
+  assert.ok(!(await muncul('category=florist')), 'vendor belum terverifikasi masih muncul di daftar');
+  assert.strictEqual((await api(`/vendors/${vendorId}`)).status, 404, 'detail vendor belum terverifikasi harusnya 404');
+  assert.strictEqual((await api(`/vendors/${vendorId}/services`)).body.data.length, 0, 'layanannya masih terdaftar');
+  assert.strictEqual((await api(`/services/${s.body.service.service_id}/availability?from=${futureDate(10)}&to=${futureDate(20)}`)).status, 404, 'kalendernya masih terbuka');
+  await pool.query('UPDATE vendors SET is_verified = TRUE WHERE vendor_id = $1', [vendorId]);
+  ok('vendor belum terverifikasi tidak tampil (daftar, detail, layanan, kalender)');
 
   assert.ok(
     await muncul(`category=florist&event_date=${TGL}`),

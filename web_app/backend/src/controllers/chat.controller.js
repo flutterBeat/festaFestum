@@ -369,7 +369,7 @@ async function mulaiKonsultasi(req, res, next) {
     }
 
     const { rows: vendor } = await pool.query(
-      'SELECT vendor_id, owner_user_id FROM vendors WHERE vendor_id = $1',
+      'SELECT vendor_id, owner_user_id FROM vendors WHERE vendor_id = $1 AND is_verified = TRUE',
       [req.params.vendorId]
     );
     if (vendor.length === 0) {

@@ -43,7 +43,7 @@ const tiruan = http.createServer((req, res) => {
     const buat = async (kategori, vendor, layanan, harga) => {
       const { rows: [r] } = await pool.query(
         `WITH v AS (
-           INSERT INTO vendors (owner_user_id, business_name) VALUES ($1, $2)
+           INSERT INTO vendors (owner_user_id, business_name, is_verified) VALUES ($1, $2, TRUE)
            RETURNING vendor_id, business_name
          )
          INSERT INTO services (vendor_id, service_name, category, price, minimum_notice_days)

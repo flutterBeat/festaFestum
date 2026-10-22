@@ -83,7 +83,7 @@ async function rekomendasi(req, res, next) {
              JOIN unnest($1::text[], $2::text[]) AS p(bisnis, layanan)
                ON lower(v.business_name) = lower(p.bisnis)
               AND lower(s.service_name) = lower(p.layanan)
-            WHERE s.is_active = TRUE`,
+            WHERE s.is_active = TRUE AND v.is_verified = TRUE`,
           [item.map((x) => x.business_name), item.map((x) => x.service_name)]
         )
       : { rows: [] };

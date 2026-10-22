@@ -204,6 +204,7 @@ async function listServices(req, res, next) {
               (image_url IS NOT NULL) AS has_photo
        FROM services
        WHERE vendor_id = $1 AND is_active = TRUE
+         AND EXISTS (SELECT 1 FROM vendors v WHERE v.vendor_id = $1 AND v.is_verified = TRUE)
          AND ($2::text IS NULL OR category = $2::vendor_category)
        ORDER BY price ASC`,
       [vendorId, category || null]

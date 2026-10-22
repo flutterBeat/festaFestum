@@ -61,6 +61,8 @@ function cek(nama, syarat, detail = '') {
     method: 'POST', token,
     body: { business_name: `Hapus Uji ${uniq()}`, city: 'depok' },
   });
+  // Vendor baru belum diverifikasi admin, dan yang belum tidak tampil ke publik.
+  await pool.query('UPDATE vendors SET is_verified = TRUE WHERE vendor_id = $1', [v.body.vendor.vendor_id]);
   assert.strictEqual(v.status, 201, `buat vendor gagal: ${JSON.stringify(v.body)}`);
   const vendorId = v.body.vendor.vendor_id;
 

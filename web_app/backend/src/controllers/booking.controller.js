@@ -117,7 +117,7 @@ async function createBooking(req, res, next) {
               ($2::date >= CURRENT_DATE + s.minimum_notice_days) AS notice_ok
          FROM services s
          JOIN vendors  v ON v.vendor_id = s.vendor_id
-        WHERE s.service_id = $1 AND s.is_active = TRUE`,
+        WHERE s.service_id = $1 AND s.is_active = TRUE AND v.is_verified = TRUE`,
       [service_id, event_date]
     );
 

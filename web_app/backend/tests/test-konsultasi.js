@@ -38,6 +38,8 @@ async function register(role) {
 async function vendorEo() {
   const token = await register('vendor_owner')
   const v = await api('/vendors', { method: 'POST', token, body: { business_name: `EO Uji ${uniq()}`, city: 'depok' } })
+  // Vendor baru belum diverifikasi admin, dan yang belum tidak tampil ke publik.
+  await pool.query('UPDATE vendors SET is_verified = TRUE WHERE vendor_id = $1', [v.body.vendor.vendor_id])
   assert.strictEqual(v.status, 201, JSON.stringify(v.body))
   const s = await api(`/vendors/${v.body.vendor.vendor_id}/services`, {
     method: 'POST', token,

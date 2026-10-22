@@ -57,6 +57,8 @@ const BNI = { bank_name: 'bni', bank_account_number: '0099887766', bank_account_
     method: 'POST', token: vendor.token,
     body: { business_name: `Uji Payout ${uniq()}`, city: 'jakarta_selatan', description: 'uji' },
   });
+  // Vendor baru belum diverifikasi admin, dan yang belum tidak tampil ke publik.
+  await pool.query('UPDATE vendors SET is_verified = TRUE WHERE vendor_id = $1', [v.body.vendor.vendor_id]);
   assert.strictEqual(v.status, 201, `buat vendor gagal: ${JSON.stringify(v.body)}`);
   const s = await api(`/vendors/${v.body.vendor.vendor_id}/services`, {
     method: 'POST', token: vendor.token,

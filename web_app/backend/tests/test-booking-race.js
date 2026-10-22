@@ -50,6 +50,8 @@ function futureDate(daysAhead = 90) {
     method: 'POST', token: vendorToken,
     body: { business_name: `Race Test ${uniq()}`, city: 'depok' },
   });
+  // Vendor baru belum diverifikasi admin, dan yang belum tidak tampil ke publik.
+  await pool.query('UPDATE vendors SET is_verified = TRUE WHERE vendor_id = $1', [vendor.body.vendor.vendor_id]);
   assert.strictEqual(vendor.status, 201, `buat vendor gagal: ${JSON.stringify(vendor.body)}`);
 
   const service = await api(`/vendors/${vendor.body.vendor.vendor_id}/services`, {

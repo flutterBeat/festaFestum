@@ -52,6 +52,8 @@ const ok = (l) => { langkah++; console.log(`  ${String(langkah).padStart(2)}. ${
     method: 'POST', token: vendorToken,
     body: { business_name: `Alur Test ${uniq()}`, city: 'depok', description: 'Vendor uji alur' },
   });
+  // Vendor baru belum diverifikasi admin, dan yang belum tidak tampil ke publik.
+  await pool.query('UPDATE vendors SET is_verified = TRUE WHERE vendor_id = $1', [vendor.body.vendor.vendor_id]);
   const vendorId = vendor.body.vendor.vendor_id;
 
   await api(`/vendors/${vendorId}/services`, {

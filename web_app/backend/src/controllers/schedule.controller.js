@@ -49,7 +49,7 @@ const sqlKetersediaan = (svc, dari, sampai) => `
     SELECT s.vendor_id, s.category, s.minimum_notice_days, v.daily_capacity
       FROM services s
       JOIN vendors  v ON v.vendor_id = s.vendor_id
-     WHERE s.service_id = ${svc} AND s.is_active = TRUE
+     WHERE s.service_id = ${svc} AND s.is_active = TRUE AND v.is_verified = TRUE
   ),
   hari AS (
     SELECT d::date AS event_date
@@ -101,7 +101,7 @@ async function cekTanggal(service_id, event_date) {
        FROM services s
        JOIN vendors  v ON v.vendor_id = s.vendor_id
        CROSS JOIN LATERAL (${sqlKetersediaan('$1', '$2', '$2')}) k
-      WHERE s.service_id = $1 AND s.is_active = TRUE`,
+      WHERE s.service_id = $1 AND s.is_active = TRUE AND v.is_verified = TRUE`,
     [service_id, event_date]
   );
   return q.rows[0] || null;
@@ -266,7 +266,7 @@ async function listAvailability(req, res, next) {
               (CURRENT_DATE + ${HORIZON_HARI})::text AS paling_lama
          FROM services s
          JOIN vendors  v ON v.vendor_id = s.vendor_id
-        WHERE s.service_id = $1 AND s.is_active = TRUE`,
+        WHERE s.service_id = $1 AND s.is_active = TRUE AND v.is_verified = TRUE`,
       [serviceId]
     );
 
@@ -315,7 +315,7 @@ async function listJamTerisi(req, res, next) {
               v.daily_capacity, v.jeda_menit
          FROM services s
          JOIN vendors  v ON v.vendor_id = s.vendor_id
-        WHERE s.service_id = $1 AND s.is_active = TRUE`,
+        WHERE s.service_id = $1 AND s.is_active = TRUE AND v.is_verified = TRUE`,
       [req.params.serviceId]
     );
     if (svc.rows.length === 0) {

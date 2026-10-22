@@ -53,6 +53,8 @@ const ok = (l) => { pass++; console.log(`  OK  ${l}`); };
     method: 'POST', token: vendorToken,
     body: { business_name: `Dash Test ${uniq()}`, city: 'bekasi' },
   });
+  // Vendor baru belum diverifikasi admin, dan yang belum tidak tampil ke publik.
+  await pool.query('UPDATE vendors SET is_verified = TRUE WHERE vendor_id = $1', [vendor.body.vendor.vendor_id]);
   const service = await api(`/vendors/${vendor.body.vendor.vendor_id}/services`, {
     method: 'POST', token: vendorToken,
     body: {

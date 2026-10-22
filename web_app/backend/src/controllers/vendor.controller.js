@@ -68,7 +68,8 @@ async function listVendors(req, res, next) {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50);
     const offset = (page - 1) * limit;
 
-    const conditions = [];
+    // Vendor yang belum diverifikasi admin tidak tampil ke publik sama sekali.
+    const conditions = ['v.is_verified = TRUE'];
     const values = [];
     // Indeks parameter kategori, dipakai ulang oleh price_start_from di SELECT.
     // null kalau tidak ada filter kategori.
@@ -235,7 +236,7 @@ async function getVendorDetail(req, res, next) {
     const vendorResult = await pool.query(
       `SELECT vendor_id, business_name, city, address, description,
               is_verified, rating_avg, rating_count, created_at
-       FROM vendors WHERE vendor_id = $1`,
+       FROM vendors WHERE vendor_id = $1 AND is_verified = TRUE`,
       [vendorId]
     );
 

@@ -53,6 +53,8 @@ async function buatVendor() {
     method: 'POST', token,
     body: { business_name: `Studio ${tag}`, city: 'jakarta_selatan' },
   });
+  // Vendor baru belum diverifikasi admin, dan yang belum tidak tampil ke publik.
+  await pool.query('UPDATE vendors SET is_verified = TRUE WHERE vendor_id = $1', [buat.body.vendor.vendor_id]);
   assert.strictEqual(buat.status, 201, `buat vendor gagal: ${JSON.stringify(buat.body)}`);
   const vendorId = buat.body.vendor.vendor_id;
 

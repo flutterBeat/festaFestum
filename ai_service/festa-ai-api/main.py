@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
-from openai import OpenAI          # dulu: from groq import Groq
+from openai import OpenAI          
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 client = OpenAI(
@@ -34,8 +34,6 @@ class EventRequest(BaseModel):
     location: str = Field(..., min_length=1)
     fokus_prioritas: list[str] = []
     
-# extra="forbid" + tanpa nilai default: syarat strict mode Groq
-# (additionalProperties: false, semua field required).
 class ItemEstimasi(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kategori: str
@@ -85,8 +83,6 @@ def filter_by_location(df: pd.DataFrame, location: str) -> pd.DataFrame:
     return df[df["city"].astype(str).str.lower() == kode_kota(location)]
 
 # Urutan kota dari yang terdekat, perkiraan jarak antar-wilayah. Dipakai
-# kalau satu kategori kosong di kota acara. Ditulis tangan, bukan ditanya ke
-# AI: model tidak bisa diandalkan soal geografi.
 KOTA_TERDEKAT = {
     "jakarta_utara": ["jakarta_pusat", "jakarta_timur", "jakarta_barat", "bekasi", "jakarta_selatan", "tangerang", "depok", "tangerang_selatan", "bogor"],
     "jakarta_pusat": ["jakarta_utara", "jakarta_barat", "jakarta_timur", "jakarta_selatan", "bekasi", "tangerang", "depok", "tangerang_selatan", "bogor"],
@@ -129,9 +125,6 @@ def format_katalog(df: pd.DataFrame) -> str:
     def rp(angka) -> str:
         return f"{int(angka):,}".replace(",", ".")
 
-    # Kota, gaya, dan status verifikasi sengaja tidak dikirim supaya muat
-    # batas 8.000 token/menit Groq: katalog sudah disaring per kota, dan
-    # preferred_style selalu kosong dari backend.
     lines = [
         f"{s.business_name} | Kategori: {s.category} | "
         f"Layanan: {s.service_name} | Harga: Rp{rp(s.price)} | Rating: {s.rating_avg}"
@@ -203,8 +196,6 @@ def get_recommendation(req: EventRequest):
     try:
         catalog = load_catalog()
         catalog_lokasi = filter_by_location(catalog, req.location)
-        # Groq gratisan dibatasi 8.000 token/menit; katalog penuh satu kota
-        # sudah melewatinya. Kategori di luar fokus juga dibuang backend.
         if req.fokus_prioritas:
             catalog_lokasi = catalog_lokasi[catalog_lokasi["category"].isin(req.fokus_prioritas)]
         catalog_lokasi, catatan = isi_kategori_kosong(
@@ -221,7 +212,7 @@ def get_recommendation(req: EventRequest):
 
         # PEMANGGILAN GROQ API
         response = client.chat.completions.create(
-            model="gemini-3.5-flash-lite", # model Llama di Groq kini khusus Enterprise
+            model="gemini-3.5-flash-lite", 
             messages=[
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt_user}
@@ -239,7 +230,6 @@ def get_recommendation(req: EventRequest):
             temperature=0.1,
         )
 
-        # EKSTRAKSI OUTPUT GROQ
         output_text = response.choices[0].message.content
         if not output_text:
             raise ValueError("Model Groq tidak mengembalikan output teks.")
